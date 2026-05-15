@@ -4,14 +4,61 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 )
 
-type Handler func(w http.ResponseWriter, r *http.Request)
+type nodeType uint8
+
+type methodIndex int
+
+const maxParams = 8
+
+const (
+	nodeStatic nodeType = iota
+	nodeParam
+	nodeWildcard
+)
+
+const (
+	methodGET methodIndex = iota
+	methodPOST
+	methodPUT
+	methodDELETE
+	methodPATCH
+	methodHEAD
+	methodOPTIONS
+	methodCONNECT
+	methodTRACE
+	methodCount
+)
+
+type paramEntry struct {
+	key   string
+	value string
+}
+
+type Params struct {
+	entries [maxParams]paramEntry
+	count   int
+}
+
+type routeNode struct {
+	prefix         string
+	nodeType       nodeType
+	paramName      string
+	staticChildren []*routeNode
+	paramChild     *routeNode
+	wildChild      *routeNode
+	handlers       [methodCount]Handler
+}
 
 type Router struct {
-	routes          map[string]map[string]Handler
+	root            *routeNode
+	paramPool       sync.Pool
 	notFoundHandler Handler
 }
+
+type Handler func(w http.ResponseWriter, r *http.Request)
 
 func NewRouter() *Router {
 	return &Router{
