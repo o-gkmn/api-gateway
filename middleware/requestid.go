@@ -1,12 +1,12 @@
 package middleware
 
 import (
+	"api-gateway/logger"
+	"api-gateway/server"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"httpserver/logger"
-	"httpserver/server"
 	"io"
 	"log/slog"
 	"net/http"

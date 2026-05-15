@@ -1,13 +1,14 @@
 package main
 
 import (
+	"api-gateway/handlers"
+	"api-gateway/logger"
+	"api-gateway/middleware"
+	"api-gateway/server"
+	"api-gateway/utils"
 	"context"
 	"errors"
 	"fmt"
-	"httpserver/handlers"
-	"httpserver/logger"
-	"httpserver/middleware"
-	"httpserver/server"
 	"log"
 	"net/http"
 	"os"
@@ -19,13 +20,19 @@ import (
 func main() {
 	logger.Init()
 
-	s := server.NewServer(8080)
+	logger.Info("Starting server...")
+	port := utils.GetEnvInt("PORT", 8080)
+	s := server.NewServer(port)
 
 	s.Use(middleware.RequestID())
+
+	logger.Info("Middlewares is ready")
 
 	s.Router.GET("/healthz", handlers.HealthHandler)
 	ready := handlers.NewReadyHandler()
 	s.Router.GET("/readyz", ready.ServeHTTP)
+
+	logger.Info("Router is ready")
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
@@ -36,7 +43,7 @@ func main() {
 		}
 	}()
 
-	fmt.Println("Server is running...")
+	logger.Info("Server is running...")
 
 	<-stop
 

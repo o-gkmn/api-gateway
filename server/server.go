@@ -1,6 +1,8 @@
 package server
 
 import (
+	"api-gateway/logger"
+	"api-gateway/utils"
 	"context"
 	"fmt"
 	"net/http"
@@ -22,24 +24,26 @@ func NewServer(port int) *Server {
 		middlewares: []Middleware{},
 	}
 
-	s.Router = NewRouter(s)
+	s.Router = NewRouter()
 
 	return s
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.Router.ServeHTTP(w, r)
-}
-
 func (s *Server) Run() error {
 	addr := fmt.Sprintf(":%d", s.port)
+
+	h := Chain(s.Router.ServeHTTP, s.middlewares...)
+
 	s.server = &http.Server{
 		Addr:    addr,
-		Handler: s,
+		Handler: http.HandlerFunc(h),
 	}
 
-	fmt.Printf("server listening on %s\n", addr)
-	return s.server.ListenAndServe()
+	certPath := utils.GetEnv("SSL_CERT_PATH", "")
+	keyPath := utils.GetEnv("SSL_KEY_PATH", "")
+
+	logger.Info(fmt.Sprintf("Listening on port %d", s.port))
+	return s.server.ListenAndServeTLS(certPath, keyPath)
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {

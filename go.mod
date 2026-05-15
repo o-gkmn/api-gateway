@@ -1,3 +1,3 @@
-module httpserver
+module api-gateway
 
 go 1.26.2

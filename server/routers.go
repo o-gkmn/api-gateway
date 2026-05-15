@@ -10,13 +10,11 @@ type Handler func(w http.ResponseWriter, r *http.Request)
 
 type Router struct {
 	routes          map[string]map[string]Handler
-	server          *Server
 	notFoundHandler Handler
 }
 
-func NewRouter(server *Server) *Router {
+func NewRouter() *Router {
 	return &Router{
-		server:          server,
 		routes:          make(map[string]map[string]Handler),
 		notFoundHandler: defaultNotFoundHandler,
 	}
@@ -72,11 +70,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		r.notFoundHandler(w, req)
 		return
 	}
-
-	if r.server != nil {
-		handler = r.server.ApplyMiddleware(handler)
-	}
-
 	handler(w, req)
 }
 
