@@ -1,6 +1,7 @@
 package server
 
 import (
+	"api-gateway/internal/router"
 	"api-gateway/logger"
 	"api-gateway/utils"
 	"context"
@@ -10,7 +11,7 @@ import (
 
 type Server struct {
 	port         int
-	Router       *Router
+	Router       *router.Router
 	server       *http.Server
 	middlewares  []Middleware
 	errorHandler ErrorHandler
@@ -24,7 +25,7 @@ func NewServer(port int) *Server {
 		middlewares: []Middleware{},
 	}
 
-	s.Router = NewRouter()
+	s.Router = router.NewRouter()
 
 	return s
 }
@@ -50,7 +51,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-func (s *Server) GetRouter() *Router {
+func (s *Server) GetRouter() *router.Router {
 	return s.Router
 }
 

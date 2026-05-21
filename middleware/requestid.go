@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"api-gateway/internal/router"
 	"api-gateway/logger"
 	"api-gateway/server"
 	"context"
@@ -17,7 +18,7 @@ type contextKey string
 const requestIDKey = contextKey("requestID")
 
 func RequestID() server.Middleware {
-	return func(next server.Handler) server.Handler {
+	return func(next router.Handler) router.Handler {
 		return func(w http.ResponseWriter, r *http.Request) {
 			id := r.Header.Get("X-Request-Id")
 			if id == "" {
