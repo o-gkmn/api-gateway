@@ -1,8 +1,7 @@
 package router
 
 import (
-	"api-gateway/logger"
-	"log/slog"
+	"errors"
 	"strings"
 )
 
@@ -11,7 +10,7 @@ type pathPart struct {
 	kind nodeType
 }
 
-func parsePath(p string) []pathPart {
+func parsePath(p string) ([]pathPart, error) {
 	parts := make([]pathPart, 0)
 
 	ps := strings.Split(p, "/")
@@ -19,32 +18,17 @@ func parsePath(p string) []pathPart {
 	for i, part := range ps {
 		switch {
 		case strings.HasPrefix(part, ":"):
-			paramPart := pathPart{
-				path: part,
-				kind: nodeParam,
-			}
-			staticPart := pathPart{
-				path: buffer + "/",
-				kind: nodeStatic,
-			}
-			parts = append(parts, staticPart)
-			parts = append(parts, paramPart)
+			staticPart := pathPart{path: buffer + "/", kind: nodeStatic}
+			paramPart := pathPart{path: part, kind: nodeParam}
+			parts = append(parts, staticPart, paramPart)
 			buffer = ""
 		case strings.HasPrefix(part, "*"):
 			if i != len(ps)-1 {
-				logger.Error("wildcard path must be placed end of the path", slog.String("part", part))
-				panic("wildcard path must be placed end of the path")
+				return nil, errors.New("wildcard path must be placed at the end of the path")
 			}
-			wildcardPart := pathPart{
-				path: part,
-				kind: nodeWildcard,
-			}
-			staticPart := pathPart{
-				path: buffer + "/",
-				kind: nodeStatic,
-			}
-			parts = append(parts, staticPart)
-			parts = append(parts, wildcardPart)
+			staticPart := pathPart{path: buffer + "/", kind: nodeStatic}
+			wildcardPart := pathPart{path: part, kind: nodeWildcard}
+			parts = append(parts, staticPart, wildcardPart)
 			buffer = ""
 		default:
 			if i == 0 {
@@ -56,12 +40,8 @@ func parsePath(p string) []pathPart {
 	}
 
 	if buffer != "" {
-		staticPart := pathPart{
-			path: buffer,
-			kind: nodeStatic,
-		}
-		parts = append(parts, staticPart)
+		parts = append(parts, pathPart{path: buffer, kind: nodeStatic})
 	}
 
-	return parts
+	return parts, nil
 }
