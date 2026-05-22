@@ -2,6 +2,7 @@ package router
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -43,5 +44,28 @@ func parsePath(p string) ([]pathPart, error) {
 		parts = append(parts, pathPart{path: buffer, kind: nodeStatic})
 	}
 
+	err := validateUniqueNames(parts)
+	if err != nil {
+		return nil, err
+	}
+
 	return parts, nil
+}
+
+func validateUniqueNames(parts []pathPart) error {
+	seen := make(map[string]struct{})
+
+	for _, part := range parts {
+		if part.kind == nodeStatic {
+			continue
+		}
+
+		if _, ok := seen[part.path]; ok {
+			return fmt.Errorf("duplicate part: %s", part.path)
+		}
+
+		seen[part.path] = struct{}{}
+	}
+
+	return nil
 }

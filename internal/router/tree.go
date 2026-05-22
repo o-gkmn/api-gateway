@@ -78,16 +78,7 @@ func (t *Tree) Insert(method methodIndex, path string, handler Handler) {
 
 	n := t.root
 	for _, part := range p {
-		if part.kind == nodeStatic {
-			n = insertInto(n, part.path)
-		} else {
-			var err error
-			n, err = insertDynamicNode(n, part.path, part.kind)
-			if err != nil {
-				logger.Error("failed to insert dynamic node", slog.String("path", path), slog.String("error", err.Error()))
-				panic(err.Error())
-			}
-		}
+		n = insertPart(n, part)
 	}
 
 	if n.handlers[method] != nil {
@@ -96,6 +87,7 @@ func (t *Tree) Insert(method methodIndex, path string, handler Handler) {
 	}
 
 	n.handlers[method] = handler
+
 }
 
 func (t *Tree) Match(method methodIndex, path string) matchResult {
@@ -114,7 +106,35 @@ func (t *Tree) ReleaseParams(p *Params) {
 	t.paramPool.Put(p)
 }
 
-func insertInto(n *routeNode, remaining string) *routeNode {
+func insertPart(n *routeNode, part pathPart) *routeNode {
+	switch part.kind {
+	case nodeParam, nodeWildcard:
+		var err error
+		n, err = insertDynamicNode(n, part.path, part.kind)
+		if err != nil {
+			logger.Error("failed to insert dynamic node", slog.String("error", err.Error()))
+			panic(err.Error())
+		}
+		return n
+	case nodeStatic:
+		if n.kind == nodeStatic {
+			return insertStaticNode(n, part.path)
+		}
+
+		for _, child := range n.staticChildren {
+			if child.prefix[0] == part.path[0] {
+				return insertStaticNode(child, part.path)
+			}
+		}
+		newNode := &routeNode{prefix: part.path, kind: nodeStatic}
+		n.staticChildren = append(n.staticChildren, newNode)
+		return newNode
+	}
+
+	return n
+}
+
+func insertStaticNode(n *routeNode, remaining string) *routeNode {
 	i := commonPrefixLength(n.prefix, remaining)
 
 	// CASE 1: The prefix has not been fully consumed; a split is required
@@ -140,7 +160,7 @@ func insertInto(n *routeNode, remaining string) *routeNode {
 		rest := remaining[i:]
 		for _, child := range n.staticChildren {
 			if rest[0] == child.prefix[0] {
-				return insertInto(child, rest)
+				return insertStaticNode(child, rest)
 			}
 		}
 
