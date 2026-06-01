@@ -1,10 +1,12 @@
 package server
 
-import "api-gateway/internal/router"
+import (
+	"net/http"
+)
 
-type Middleware func(router.Handler) router.Handler
+type Middleware func(http.Handler) http.Handler
 
-func Chain(h router.Handler, middlewares ...Middleware) router.Handler {
+func Chain(h http.Handler, middlewares ...Middleware) http.Handler {
 	for i := len(middlewares) - 1; i >= 0; i-- {
 		h = middlewares[i](h)
 	}
@@ -12,7 +14,7 @@ func Chain(h router.Handler, middlewares ...Middleware) router.Handler {
 	return h
 }
 
-func (s *Server) ApplyMiddleware(h router.Handler) router.Handler {
+func (s *Server) ApplyMiddleware(h http.Handler) http.Handler {
 	if len(s.middlewares) == 0 {
 		return h
 	}

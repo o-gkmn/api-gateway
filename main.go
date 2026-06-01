@@ -24,7 +24,7 @@ func main() {
 	port := utils.GetEnvInt("PORT", 8080)
 	s := server.NewServer(port)
 
-	s.Use(middleware.RequestID())
+	s.Use(middleware.RequestID)
 
 	logger.Info("Middlewares is ready")
 

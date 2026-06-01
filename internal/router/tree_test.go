@@ -87,7 +87,7 @@ func TestTree_Insert(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			tree := NewTree()
-			handler := func(w http.ResponseWriter, r *http.Request) {}
+			handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
 
 			panicked := didPanic(func() {
 				tree.Insert(tc.insertMethod, tc.insertPath, handler)
@@ -119,7 +119,7 @@ func TestTree_Insert(t *testing.T) {
 
 func TestTree_Insert_DuplicateRoute(t *testing.T) {
 	tree := NewTree()
-	handler := func(w http.ResponseWriter, r *http.Request) {}
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
 	tree.Insert(methodGET, "/users", handler)
 
 	panicked := didPanic(func() {
@@ -133,7 +133,7 @@ func TestTree_Insert_DuplicateRoute(t *testing.T) {
 
 func TestTree_Insert_ConflictingParamName(t *testing.T) {
 	tree := NewTree()
-	handler := func(w http.ResponseWriter, r *http.Request) {}
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
 	tree.Insert(methodGET, "/users/:id", handler)
 
 	panicked := didPanic(func() {
@@ -147,7 +147,7 @@ func TestTree_Insert_ConflictingParamName(t *testing.T) {
 
 func TestMatch_ParamCapture(t *testing.T) {
 	tree := NewTree()
-	handler := func(w http.ResponseWriter, r *http.Request) {}
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
 
 	tree.Insert(methodGET, "/users/:id/orders/:orderId", handler)
 
@@ -176,7 +176,7 @@ func TestMatch_ParamCapture(t *testing.T) {
 
 func TestMatch_SameParamNameCapture(t *testing.T) {
 	tree := NewTree()
-	handler := func(w http.ResponseWriter, r *http.Request) {}
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
 
 	panicked := didPanic(func() {
 		tree.Insert(methodGET, "/users/:id/orders/:id", handler)
@@ -189,7 +189,7 @@ func TestMatch_SameParamNameCapture(t *testing.T) {
 
 func TestMatch_Backtracking(t *testing.T) {
 	tree := NewTree()
-	handler := func(w http.ResponseWriter, r *http.Request) {}
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
 
 	tree.Insert(methodGET, "/users/profile", handler)
 	tree.Insert(methodGET, "/users/:id/posts", handler)
@@ -215,7 +215,7 @@ func TestMatch_Backtracking(t *testing.T) {
 
 func TestMatch_404(t *testing.T) {
 	tree := NewTree()
-	handler := func(w http.ResponseWriter, r *http.Request) {}
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
 
 	tree.Insert(methodGET, "/users/posts", handler)
 
@@ -228,7 +228,7 @@ func TestMatch_404(t *testing.T) {
 
 func TestMatch_405(t *testing.T) {
 	tree := NewTree()
-	handler := func(w http.ResponseWriter, r *http.Request) {}
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
 	tree.Insert(methodGET, "/users/posts", handler)
 
 	result := tree.Match(methodPOST, "/users/posts")
@@ -246,7 +246,7 @@ func TestMatch_405(t *testing.T) {
 
 func TestInsert_StaticAndParamCoexist(t *testing.T) {
 	tree := NewTree()
-	handler := func(w http.ResponseWriter, r *http.Request) {}
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
 
 	tree.Insert(methodGET, "/users/profile", handler)
 	tree.Insert(methodGET, "/users/:id", handler)
@@ -262,5 +262,127 @@ func TestInsert_StaticAndParamCoexist(t *testing.T) {
 	}
 	if r2.params.entries[0].value != "42" {
 		t.Errorf("param value = %q, want 42", r2.params.entries[0].value)
+	}
+}
+
+func BenchmarkMatch_SimpleStatic(b *testing.B) {
+	tree := NewTree()
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
+	tree.Insert(methodGET, "/users", handler)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		result := tree.Match(methodGET, "/users")
+		if result.params != nil {
+			tree.ReleaseParams(result.params)
+		}
+	}
+}
+
+func BenchmarkMatch_StaticDeep(b *testing.B) {
+	tree := NewTree()
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
+	tree.Insert(methodGET, "/api/v1/users/profile/settings", handler)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := tree.Match(methodGET, "/api/v1/users/profile/settings")
+		if result.params != nil {
+			tree.ReleaseParams(result.params)
+		}
+	}
+}
+
+func BenchmarkMatch_SingleParam(b *testing.B) {
+	tree := NewTree()
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
+	tree.Insert(methodGET, "/users/:id", handler)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := tree.Match(methodGET, "/users/42")
+		if result.params != nil {
+			tree.ReleaseParams(result.params)
+		}
+	}
+}
+
+func BenchmarkMatch_MultipleParam(b *testing.B) {
+	tree := NewTree()
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
+	tree.Insert(methodGET, "/users/:id/order/:orderId/items/:itemId", handler)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := tree.Match(methodGET, "/users/42/order/21/items/99")
+		if result.params != nil {
+			tree.ReleaseParams(result.params)
+		}
+	}
+}
+
+func BenchmarkMatch_WildcardParam(b *testing.B) {
+	tree := NewTree()
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
+	tree.Insert(methodGET, "/file/*filepath", handler)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := tree.Match(methodGET, "/file/css/themes/dark.css")
+		if result.params != nil {
+			tree.ReleaseParams(result.params)
+		}
+	}
+}
+
+func BenchmarkMatch_Backtracking(b *testing.B) {
+	tree := NewTree()
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
+	tree.Insert(methodGET, "/users/profile", handler)
+	tree.Insert(methodGET, "/users/:id/posts", handler)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := tree.Match(methodGET, "/users/profile/posts")
+		if result.params != nil {
+			tree.ReleaseParams(result.params)
+		}
+	}
+}
+
+func BenchmarkMatch_MethodNotfound(b *testing.B) {
+	tree := NewTree()
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
+	tree.Insert(methodGET, "/users", handler)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := tree.Match(methodGET, "/unknwon")
+		if result.params != nil {
+			tree.ReleaseParams(result.params)
+		}
+	}
+}
+
+func BenchmarkMatch_MethodNotAllowed(b *testing.B) {
+	tree := NewTree()
+	handler := func(w http.ResponseWriter, r *http.Request, params *Params) {}
+	tree.Insert(methodGET, "/users", handler)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := tree.Match(methodPOST, "/users")
+		if result.params != nil {
+			tree.ReleaseParams(result.params)
+		}
 	}
 }

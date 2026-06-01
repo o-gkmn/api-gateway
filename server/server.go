@@ -33,15 +33,15 @@ func NewServer(port int) *Server {
 func (s *Server) Run() error {
 	addr := fmt.Sprintf(":%d", s.port)
 
-	h := Chain(s.Router.ServeHTTP, s.middlewares...)
+	h := Chain(s.Router, s.middlewares...)
 
 	s.server = &http.Server{
 		Addr:    addr,
-		Handler: http.HandlerFunc(h),
+		Handler: h,
 	}
 
-	certPath := utils.GetEnv("SSL_CERT_PATH", "")
-	keyPath := utils.GetEnv("SSL_KEY_PATH", "")
+	certPath := utils.GetEnv("SSL_CERT_PATH", "cert.pem")
+	keyPath := utils.GetEnv("SSL_KEY_PATH", "key.pem")
 
 	logger.Info(fmt.Sprintf("Listening on port %d", s.port))
 	return s.server.ListenAndServeTLS(certPath, keyPath)

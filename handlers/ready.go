@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"api-gateway/internal/router"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -37,7 +38,7 @@ func (h *ReadyHandler) Register(name string, c Checker) {
 	h.checks[name] = c
 }
 
-func (h *ReadyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *ReadyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, params *router.Params) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 

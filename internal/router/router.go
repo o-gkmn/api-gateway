@@ -1,12 +1,9 @@
 package router
 
 import (
-	"context"
 	"net/http"
 	"strings"
 )
-
-type contextKey struct{}
 
 type methodIndex int
 
@@ -37,7 +34,7 @@ var methodNames = [methodCount]string{
 	methodTRACE:   "TRACE",
 }
 
-type Handler func(w http.ResponseWriter, r *http.Request)
+type Handler func(w http.ResponseWriter, r *http.Request, params *Params)
 
 type Registrar interface {
 	GET(path string, h Handler)
@@ -52,31 +49,28 @@ type Registrar interface {
 	NotFound(handler Handler)
 }
 
-var _ Registrar = (*Router)(nil)
-var _ http.Handler = (*Router)(nil)
-
 type Router struct {
-	tree            *Tree
-	notFoundHandler Handler
+	tree                    *Tree
+	notFoundHandler         Handler
+	methodNotAllowedHandler Handler
 }
 
 func NewRouter() *Router {
 	return &Router{
-		tree:            NewTree(),
-		notFoundHandler: defaultNotFoundHandler,
+		tree:                    NewTree(),
+		notFoundHandler:         defaultNotFoundHandler,
+		methodNotAllowedHandler: defaultMethodNotAllowedHandler,
 	}
 }
 
+// NotFound sets the handler invoked when no route matches the request path.
+// The params argument is always nil for not-found responses; do not access it.
 func (r *Router) NotFound(handler Handler) {
 	r.notFoundHandler = handler
 }
 
-func Param(ctx context.Context, key string) string {
-	p, ok := ctx.Value(contextKey{}).(*Params)
-	if !ok || p == nil {
-		return ""
-	}
-	return p.Get(key)
+func (r *Router) MethodNotAllowed(handler Handler) {
+	r.methodNotAllowedHandler = handler
 }
 
 func (r *Router) GET(path string, h Handler)     { r.tree.Insert(methodGET, path, h) }
@@ -100,24 +94,27 @@ var methodStringIndex = func() map[string]methodIndex {
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	idx, ok := methodStringIndex[req.Method]
 	if !ok {
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		http.Error(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
 		return
 	}
 
 	result := r.tree.Match(idx, req.URL.Path)
 	switch result.status {
 	case http.StatusOK:
-		ctx := context.WithValue(req.Context(), contextKey{}, result.params)
-		result.handler(w, req.WithContext(ctx))
-		r.tree.ReleaseParams(result.params)
+		defer r.tree.ReleaseParams(result.params)
+		result.handler(w, req, result.params)
 	case http.StatusMethodNotAllowed:
 		w.Header().Set("Allow", strings.Join(result.allowedMethods, ", "))
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	default:
-		r.notFoundHandler(w, req)
+		r.notFoundHandler(w, req, nil)
 	}
 }
 
-func defaultNotFoundHandler(w http.ResponseWriter, r *http.Request) {
+func defaultNotFoundHandler(w http.ResponseWriter, r *http.Request, params *Params) {
 	http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+}
+
+func defaultMethodNotAllowedHandler(w http.ResponseWriter, r *http.Request, params *Params) {
+	http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 }

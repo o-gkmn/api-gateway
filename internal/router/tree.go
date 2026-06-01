@@ -336,20 +336,13 @@ func tryMatch(n *routeNode, remaining string, params *Params, method methodIndex
 	var best405 matchResult
 	best405.status = http.StatusNotFound
 
-	tryChild := func(child *routeNode) matchResult {
-		result := tryMatch(child, remaining, params, method)
-		if result.status != http.StatusOK {
-			params.restore(snap)
-		}
-		return result
-	}
-
 	for _, child := range n.staticChildren {
 		if child.prefix[0] == remaining[0] {
-			result := tryChild(child)
+			result := tryMatch(child, remaining, params, method)
 			if result.status == http.StatusOK {
 				return result
 			}
+			params.restore(snap)
 			if result.status == http.StatusMethodNotAllowed && best405.status != http.StatusMethodNotAllowed {
 				best405 = result
 			}
@@ -358,20 +351,22 @@ func tryMatch(n *routeNode, remaining string, params *Params, method methodIndex
 	}
 
 	if n.paramChild != nil {
-		result := tryChild(n.paramChild)
+		result := tryMatch(n.paramChild, remaining, params, method)
 		if result.status == http.StatusOK {
 			return result
 		}
+		params.restore(snap)
 		if result.status == http.StatusMethodNotAllowed && best405.status != http.StatusMethodNotAllowed {
 			best405 = result
 		}
 	}
 
 	if n.wildChild != nil {
-		result := tryChild(n.wildChild)
+		result := tryMatch(n.wildChild, remaining, params, method)
 		if result.status == http.StatusOK {
 			return result
 		}
+		params.restore(snap)
 		if result.status == http.StatusMethodNotAllowed && best405.status != http.StatusMethodNotAllowed {
 			best405 = result
 		}
