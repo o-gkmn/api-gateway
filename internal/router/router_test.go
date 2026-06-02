@@ -8,6 +8,61 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+func TestTrailingSlash(t *testing.T) {
+	r := NewRouter()
+	r.GET("/users", func(w http.ResponseWriter, req *http.Request, p *Params) {})
+
+	// Slash ile gelen istek
+	req := httptest.NewRequest("GET", "/users/", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("trailing slash: got %d, want 200", w.Code)
+	}
+}
+
+func TestCaseInsensitive(t *testing.T) {
+	r := NewRouter()
+	r.CaseInsensitive()
+	r.GET("/Users", func(w http.ResponseWriter, req *http.Request, p *Params) {})
+
+	req := httptest.NewRequest("GET", "/users", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("case insensitive: got %d, want 200", w.Code)
+	}
+}
+
+func TestCaseSensitive_Default(t *testing.T) {
+	r := NewRouter()
+	// CaseInsensitive() çağrılmadı — default strict
+	r.GET("/Users", func(w http.ResponseWriter, req *http.Request, p *Params) {})
+
+	req := httptest.NewRequest("GET", "/users", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("case sensitive default: got %d, want 404", w.Code)
+	}
+}
+
+func TestRootPath(t *testing.T) {
+	r := NewRouter()
+	r.GET("/", func(w http.ResponseWriter, req *http.Request, p *Params) {})
+
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("root path: got %d, want 200", w.Code)
+	}
+}
+
 func BenchmarkComparisonMine_Static(b *testing.B) {
 	r := NewRouter()
 	r.GET("/users", func(w http.ResponseWriter, r *http.Request, params *Params) {})

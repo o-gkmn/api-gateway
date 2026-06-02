@@ -53,6 +53,7 @@ type Router struct {
 	tree                    *Tree
 	notFoundHandler         Handler
 	methodNotAllowedHandler Handler
+	caseInsensitive         bool
 }
 
 func NewRouter() *Router {
@@ -60,6 +61,7 @@ func NewRouter() *Router {
 		tree:                    NewTree(),
 		notFoundHandler:         defaultNotFoundHandler,
 		methodNotAllowedHandler: defaultMethodNotAllowedHandler,
+		caseInsensitive:         false,
 	}
 }
 
@@ -73,15 +75,19 @@ func (r *Router) MethodNotAllowed(handler Handler) {
 	r.methodNotAllowedHandler = handler
 }
 
-func (r *Router) GET(path string, h Handler)     { r.tree.Insert(methodGET, path, h) }
-func (r *Router) POST(path string, h Handler)    { r.tree.Insert(methodPOST, path, h) }
-func (r *Router) PUT(path string, h Handler)     { r.tree.Insert(methodPUT, path, h) }
-func (r *Router) PATCH(path string, h Handler)   { r.tree.Insert(methodPATCH, path, h) }
-func (r *Router) DELETE(path string, h Handler)  { r.tree.Insert(methodDELETE, path, h) }
-func (r *Router) OPTIONS(path string, h Handler) { r.tree.Insert(methodOPTIONS, path, h) }
-func (r *Router) HEAD(path string, h Handler)    { r.tree.Insert(methodHEAD, path, h) }
-func (r *Router) CONNECT(path string, h Handler) { r.tree.Insert(methodCONNECT, path, h) }
-func (r *Router) TRACE(path string, h Handler)   { r.tree.Insert(methodTRACE, path, h) }
+func (r *Router) CaseInsensitive() {
+	r.caseInsensitive = true
+}
+
+func (r *Router) GET(path string, h Handler)     { r.tree.Insert(methodGET, r.normalize(path), h) }
+func (r *Router) POST(path string, h Handler)    { r.tree.Insert(methodPOST, r.normalize(path), h) }
+func (r *Router) PUT(path string, h Handler)     { r.tree.Insert(methodPUT, r.normalize(path), h) }
+func (r *Router) PATCH(path string, h Handler)   { r.tree.Insert(methodPATCH, r.normalize(path), h) }
+func (r *Router) DELETE(path string, h Handler)  { r.tree.Insert(methodDELETE, r.normalize(path), h) }
+func (r *Router) OPTIONS(path string, h Handler) { r.tree.Insert(methodOPTIONS, r.normalize(path), h) }
+func (r *Router) HEAD(path string, h Handler)    { r.tree.Insert(methodHEAD, r.normalize(path), h) }
+func (r *Router) CONNECT(path string, h Handler) { r.tree.Insert(methodCONNECT, r.normalize(path), h) }
+func (r *Router) TRACE(path string, h Handler)   { r.tree.Insert(methodTRACE, r.normalize(path), h) }
 
 var methodStringIndex = func() map[string]methodIndex {
 	m := make(map[string]methodIndex, methodCount)
@@ -98,7 +104,14 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	result := r.tree.Match(idx, req.URL.Path)
+	path := r.normalize(req.URL.Path)
+
+	// /users/ and /user are same route
+	if len(path) > 1 && path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+
+	result := r.tree.Match(idx, path)
 	switch result.status {
 	case http.StatusOK:
 		defer r.tree.ReleaseParams(result.params)
@@ -117,4 +130,12 @@ func defaultNotFoundHandler(w http.ResponseWriter, r *http.Request, params *Para
 
 func defaultMethodNotAllowedHandler(w http.ResponseWriter, r *http.Request, params *Params) {
 	http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+}
+
+func (r *Router) normalize(path string) string {
+	if r.caseInsensitive {
+		return strings.ToLower(path)
+	}
+
+	return path
 }
