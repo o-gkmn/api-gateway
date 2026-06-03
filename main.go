@@ -2,11 +2,14 @@ package main
 
 import (
 	"api-gateway/handlers"
+	"api-gateway/internal/config"
+	"api-gateway/internal/middleware"
 	"api-gateway/logger"
-	"api-gateway/middleware"
 	"api-gateway/server"
-	"api-gateway/utils"
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"log"
@@ -18,13 +21,29 @@ import (
 )
 
 func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	key, err := loadRSAPublicKey(cfg.JWTPublicKeyPath)
+	if err != nil {
+		log.Fatalf("failed to load RSA public key: %v", err)
+	}
+
 	logger.Init()
-
 	logger.Info("Starting server...")
-	port := utils.GetEnvInt("PORT", 8080)
-	s := server.NewServer(port)
 
+	s := server.NewServer(cfg.Addr, cfg.Port, cfg.SSLCertPath, cfg.SSLKeyPath)
+
+	rl := middleware.NewRateLimiter(10, 20)
+	v := middleware.NewJWTVerifier(key, cfg.JWTIssuer, cfg.JWTAudience)
+
+	s.Use(middleware.Recovery)
 	s.Use(middleware.RequestID)
+	s.Use(middleware.Logger)
+	s.Use(rl.RateLimit)
+	s.Use(middleware.Auth(v))
 
 	logger.Info("Middlewares is ready")
 
@@ -56,4 +75,24 @@ func main() {
 	}
 
 	fmt.Println("Server stopped")
+}
+
+func loadRSAPublicKey(path string) (*rsa.PublicKey, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read RSA public key: %w", err)
+	}
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block")
+	}
+	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse RSA public key: %w", err)
+	}
+	rsaPub, ok := pub.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.New("failed to parse RSA public key")
+	}
+	return rsaPub, nil
 }

@@ -1,28 +1,34 @@
 package server
 
 import (
+	"api-gateway/internal/middleware"
 	"api-gateway/internal/router"
 	"api-gateway/logger"
-	"api-gateway/utils"
 	"context"
 	"fmt"
 	"net/http"
 )
 
 type Server struct {
+	addr         string
 	port         int
-	Router       *router.Router
+	certPath     string
+	keyPath      string
 	server       *http.Server
-	middlewares  []Middleware
+	Router       *router.Router
+	middlewares  []middleware.Middleware
 	errorHandler ErrorHandler
 }
 
 type Option func(*Server)
 
-func NewServer(port int) *Server {
+func NewServer(addr string, port int, certPath, keyPath string) *Server {
 	s := &Server{
+		addr:        addr,
 		port:        port,
-		middlewares: []Middleware{},
+		certPath:    certPath,
+		keyPath:     keyPath,
+		middlewares: []middleware.Middleware{},
 	}
 
 	s.Router = router.NewRouter()
@@ -31,20 +37,17 @@ func NewServer(port int) *Server {
 }
 
 func (s *Server) Run() error {
-	addr := fmt.Sprintf(":%d", s.port)
+	addr := fmt.Sprintf("%s:%d", s.addr, s.port)
 
-	h := Chain(s.Router, s.middlewares...)
+	h := middleware.Chain(s.Router, s.middlewares...)
 
 	s.server = &http.Server{
 		Addr:    addr,
 		Handler: h,
 	}
 
-	certPath := utils.GetEnv("SSL_CERT_PATH", "cert.pem")
-	keyPath := utils.GetEnv("SSL_KEY_PATH", "key.pem")
-
-	logger.Info(fmt.Sprintf("Listening on port %d", s.port))
-	return s.server.ListenAndServeTLS(certPath, keyPath)
+	logger.Info(fmt.Sprintf("Listening on %s", addr))
+	return s.server.ListenAndServeTLS(s.certPath, s.keyPath)
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
@@ -53,6 +56,14 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 func (s *Server) GetRouter() *router.Router {
 	return s.Router
+}
+
+func (s *Server) ApplyMiddleware(h http.Handler) http.Handler {
+	return middleware.Chain(h, s.middlewares...)
+}
+
+func (s *Server) Use(middlewares ...middleware.Middleware) {
+	s.middlewares = append(s.middlewares, middlewares...)
 }
 
 type ErrorHandler func(w http.ResponseWriter, r *http.Request, err error)

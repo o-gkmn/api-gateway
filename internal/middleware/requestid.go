@@ -1,8 +1,8 @@
 package middleware
 
 import (
+	"api-gateway/internal/reqctx"
 	"api-gateway/logger"
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -11,18 +11,15 @@ import (
 	"net/http"
 )
 
-type contextKey string
-
-const requestIDKey = contextKey("requestID")
-
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := r.Header.Get("X-Request-Id")
+		id := r.Header.Get("X-Request-ID")
 		if id == "" {
 			id = generateID()
 		}
 
-		ctx := context.WithValue(r.Context(), requestIDKey, id)
+		w.Header().Set("X-Request-ID", id)
+		ctx := reqctx.WithRequestID(r.Context(), id)
 		ctx = logger.With(ctx, slog.String("request_id", id))
 
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -35,9 +32,4 @@ func generateID() string {
 		panic(fmt.Errorf("failed to generate random ID: %s", err))
 	}
 	return hex.EncodeToString(b)
-}
-
-func RequestIDFromContext(ctx context.Context) string {
-	id, _ := ctx.Value(requestIDKey).(string)
-	return id
 }
