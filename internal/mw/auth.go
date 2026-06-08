@@ -1,7 +1,8 @@
-package middleware
+package mw
 
 import (
 	"api-gateway/internal/reqctx"
+	"api-gateway/internal/router"
 	"context"
 	"crypto/rsa"
 	"errors"
@@ -15,9 +16,9 @@ type Verifier interface {
 	Verify(ctx context.Context, token string) (*reqctx.Claims, error)
 }
 
-func Auth(verifier Verifier) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func Auth(verifier Verifier) func(handler router.Handler) router.Handler {
+	return func(next router.Handler) router.Handler {
+		return func(w http.ResponseWriter, r *http.Request, params *router.Params) {
 			tok, ok := bearerToken(r)
 			if !ok {
 				w.Header().Set("WWW-Authenticate", `Bearer"`)
@@ -32,8 +33,8 @@ func Auth(verifier Verifier) func(http.Handler) http.Handler {
 				return
 			}
 			ctx := reqctx.WithClaims(r.Context(), claims)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
+			next(w, r.WithContext(ctx), params)
+		}
 	}
 }
 

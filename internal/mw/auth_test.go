@@ -1,7 +1,8 @@
-package middleware
+package mw
 
 import (
 	"api-gateway/internal/reqctx"
+	"api-gateway/internal/router"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -25,14 +26,14 @@ func (f *fakeVerifier) Verify(ctx context.Context, token string) (*reqctx.Claims
 
 func TestAuth_MissingHeader(t *testing.T) {
 	called := false
-	h := Auth(&fakeVerifier{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := Auth(&fakeVerifier{})(func(w http.ResponseWriter, r *http.Request, params *router.Params) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}))
+	})
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	h.ServeHTTP(w, r)
+	h(w, r, nil)
 
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("got %d, want %d", w.Code, http.StatusUnauthorized)
@@ -49,15 +50,15 @@ func TestAuth_MissingHeader(t *testing.T) {
 
 func TestAuth_MalformedHeader(t *testing.T) {
 	called := false
-	h := Auth(&fakeVerifier{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := Auth(&fakeVerifier{})(func(w http.ResponseWriter, r *http.Request, params *router.Params) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}))
+	})
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r.Header.Set("Authorization", "invalid")
-	h.ServeHTTP(w, r)
+	h(w, r, nil)
 
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("got %d, want %d", w.Code, http.StatusUnauthorized)
@@ -75,15 +76,15 @@ func TestAuth_MalformedHeader(t *testing.T) {
 func TestAuth_InvalidToken(t *testing.T) {
 	called := false
 	verifier := &fakeVerifier{err: errors.New("invalid token")}
-	h := Auth(verifier)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := Auth(verifier)(func(w http.ResponseWriter, r *http.Request, params *router.Params) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}))
+	})
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r.Header.Set("Authorization", "Bearer invalid")
-	h.ServeHTTP(w, r)
+	h(w, r, nil)
 
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("got %d, want %d", w.Code, http.StatusUnauthorized)
@@ -100,16 +101,16 @@ func TestAuth_ValidToken_PutsClaimsInContext(t *testing.T) {
 	called := false
 
 	verifier := &fakeVerifier{claims: want}
-	h := Auth(verifier)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := Auth(verifier)(func(w http.ResponseWriter, r *http.Request, params *router.Params) {
 		called = true
 		got, _ = reqctx.GetClaims(r.Context())
 		w.WriteHeader(http.StatusOK)
-	}))
+	})
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r.Header.Set("Authorization", "Bearer test")
-	h.ServeHTTP(w, r)
+	h(w, r, nil)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("got %d, want %d", w.Code, http.StatusOK)

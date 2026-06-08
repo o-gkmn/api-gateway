@@ -1,34 +1,47 @@
 package server
 
 import (
-	"api-gateway/internal/middleware"
+	"api-gateway/internal/mw"
 	"api-gateway/internal/router"
 	"api-gateway/logger"
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type Server struct {
-	addr         string
-	port         int
-	certPath     string
-	keyPath      string
-	server       *http.Server
-	Router       *router.Router
-	middlewares  []middleware.Middleware
-	errorHandler ErrorHandler
+	addr              string
+	port              int
+	certPath          string
+	keyPath           string
+	readHeaderTimeout time.Duration
+	readTimeout       time.Duration
+	writeTimeout      time.Duration
+	idleTimeout       time.Duration
+	server            *http.Server
+	Router            *router.Router
+	middlewares       []mw.Middleware
+	errorHandler      ErrorHandler
 }
 
 type Option func(*Server)
 
-func NewServer(addr string, port int, certPath, keyPath string) *Server {
+func NewServer(
+	addr string,
+	port int,
+	certPath, keyPath string,
+	readHeaderTimeout, readTimeout, writeTimeout, idleTimeout time.Duration) *Server {
 	s := &Server{
-		addr:        addr,
-		port:        port,
-		certPath:    certPath,
-		keyPath:     keyPath,
-		middlewares: []middleware.Middleware{},
+		addr:              addr,
+		port:              port,
+		certPath:          certPath,
+		keyPath:           keyPath,
+		readHeaderTimeout: readHeaderTimeout,
+		readTimeout:       readTimeout,
+		writeTimeout:      writeTimeout,
+		idleTimeout:       idleTimeout,
+		middlewares:       []mw.Middleware{},
 	}
 
 	s.Router = router.NewRouter()
@@ -36,18 +49,26 @@ func NewServer(addr string, port int, certPath, keyPath string) *Server {
 	return s
 }
 
-func (s *Server) Run() error {
+func (s *Server) Setup() {
 	addr := fmt.Sprintf("%s:%d", s.addr, s.port)
 
-	h := middleware.Chain(s.Router, s.middlewares...)
-
+	h := mw.Chain(s.Router, s.middlewares...)
 	s.server = &http.Server{
-		Addr:    addr,
-		Handler: h,
+		Addr:              addr,
+		Handler:           h,
+		ReadHeaderTimeout: s.readHeaderTimeout,
+		ReadTimeout:       s.readTimeout,
+		WriteTimeout:      s.writeTimeout,
+		IdleTimeout:       s.idleTimeout,
 	}
+}
 
-	logger.Info(fmt.Sprintf("Listening on %s", addr))
-	return s.server.ListenAndServeTLS(s.certPath, s.keyPath)
+func (s *Server) Serve() error {
+	logger.Info(fmt.Sprintf("Listening on %s", s.server.Addr))
+	if s.certPath != "" && s.keyPath != "" {
+		return s.server.ListenAndServeTLS(s.certPath, s.keyPath)
+	}
+	return s.server.ListenAndServe()
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
@@ -59,10 +80,10 @@ func (s *Server) GetRouter() *router.Router {
 }
 
 func (s *Server) ApplyMiddleware(h http.Handler) http.Handler {
-	return middleware.Chain(h, s.middlewares...)
+	return mw.Chain(h, s.middlewares...)
 }
 
-func (s *Server) Use(middlewares ...middleware.Middleware) {
+func (s *Server) Use(middlewares ...mw.Middleware) {
 	s.middlewares = append(s.middlewares, middlewares...)
 }
 

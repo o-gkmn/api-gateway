@@ -26,6 +26,8 @@ func (f *fakeHijackerRW) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return nil, nil, nil
 }
 
+var sinkRecorder ResponseRecorder
+
 func TestRecorder_Flush(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		wrapped := WrapWriter(w)
@@ -171,5 +173,13 @@ func TestWrapWriter_Hijacker(t *testing.T) {
 	wrapped = WrapWriter(fake)
 	if _, ok := wrapped.(http.Hijacker); !ok {
 		t.Errorf("The Hijacker below; the spiral isn't visible")
+	}
+}
+
+func BenchmarkRecorder_WrapWriter(b *testing.B) {
+	rec := httptest.NewRecorder()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		sinkRecorder = WrapWriter(rec)
 	}
 }
