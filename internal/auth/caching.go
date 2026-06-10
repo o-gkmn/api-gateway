@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"sync"
 	"time"
+	"unsafe"
 )
 
 type cacheEntry struct {
@@ -74,7 +75,12 @@ func (v *CachingVerifier) Verify(ctx context.Context, token string) (*reqctx.Cla
 	// cache's whole benefit.
 
 	// We hash the token to avoid storing the full token in memory, which could be large and sensitive.
-	hashBytes := sha256.Sum256([]byte(token))
+	// Using unsafe to convert string to []byte slice without memory allocation.
+	// Standard conversion []byte(token) forces a heap allocation and memory copy,
+	// which incurs a performance penalty and triggers Garbage Collector (GC) on hot paths.
+	// Since sha256.Sum256 only reads the bytes and does not mutate the underlying data,
+	// this zero-allocation unsafe zero-copy operation is safe and highly optimized for the API Gateway.
+	hashBytes := sha256.Sum256(unsafe.Slice(unsafe.StringData(token), len(token)))
 	hash := string(hashBytes[:])
 
 	v.mu.RLock()

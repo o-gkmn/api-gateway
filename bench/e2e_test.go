@@ -4,40 +4,52 @@ import (
 	"api-gateway/internal/auth"
 	"api-gateway/internal/mw"
 	"api-gateway/internal/router"
-	"crypto/rand"
-	"crypto/rsa"
 	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func BenchmarkMW_E2E(b *testing.B) {
+func Benchmark_E2E(b *testing.B) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	keyPEM, err := os.ReadFile("../keys/jwt_private.pem")
 	if err != nil {
-		b.Fatal(err)
+		log.Fatalf("read private key (önce ./cmd/genkey çalıştırdın mı?): %v", err)
 	}
+	priv, err := jwt.ParseRSAPrivateKeyFromPEM(keyPEM)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	const issuer = "https://auth.local.test"
 	const audience = "api-gateway"
+	const jwksUri = "http://localhost:8081/.well-known/jwks.json"
+	const cooldown = time.Second * 30
+	const refreshInterval = time.Minute * 15
 
 	inner := auth.NewJWTVerifier(&priv.PublicKey, issuer, audience)
+	//inner := auth.NewJWKSVerifier(issuer, audience, jwksUri, cooldown, refreshInterval, nil)
 	verifier := auth.NewCachingVerifier(inner, 10000, 5*time.Minute, time.Minute, time.Now)
 	defer verifier.Stop()
 
 	now := time.Now()
-	signed, err := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.RegisteredClaims{
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.RegisteredClaims{
 		Subject:   "user-123",
 		Issuer:    issuer,
 		Audience:  jwt.ClaimStrings{audience},
 		IssuedAt:  jwt.NewNumericDate(now),
 		ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
-	}).SignedString(priv)
+	})
+	token.Header["kid"] = "dev"
+
+	signed, err := token.SignedString(priv)
 	if err != nil {
 		b.Fatal(err)
 	}
