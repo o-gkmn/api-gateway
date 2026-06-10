@@ -26,10 +26,14 @@ func main() {
 		"roles": []string{"admin"},
 		"exp":   time.Now().Add(time.Hour).Unix(),
 	}
-	s, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(priv)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = "dev"
+
+	s, err := token.SignedString(priv)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	fmt.Println(s)
 }
 

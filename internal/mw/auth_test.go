@@ -1,6 +1,7 @@
 package mw
 
 import (
+	"api-gateway/internal/auth"
 	"api-gateway/internal/reqctx"
 	"api-gateway/internal/router"
 	"context"
@@ -110,7 +111,7 @@ func TestAuth_InvalidToken(t *testing.T) {
 }
 
 func TestAuth_ValidToken_PutsClaimsInContext(t *testing.T) {
-	want := &reqctx.Claims{Subject: "test", Role: []string{"admin"}}
+	want := &reqctx.Claims{Subject: "test", Roles: []string{"admin"}}
 	var got *reqctx.Claims
 	called := false
 
@@ -139,55 +140,12 @@ func TestAuth_ValidToken_PutsClaimsInContext(t *testing.T) {
 	}
 }
 
-func signRS256(t *testing.T, key *rsa.PrivateKey, claims jwt.MapClaims) string {
-	t.Helper()
-	s, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(key)
-	if err != nil {
-		t.Fatalf("failed to sign token: %v", err)
-	}
-
-	return s
-}
-
-func TestJWTVerifier_Verify(t *testing.T) {
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("failed to generate private key: %v", err)
-	}
-	v := NewJWTVerifier(&priv.PublicKey, "iss-x", "aud-x")
-
-	good := signRS256(t, priv, jwt.MapClaims{
-		"sub":   "user_1",
-		"iss":   "iss-x",
-		"aud":   "aud-x",
-		"exp":   time.Now().Add(time.Hour).Unix(),
-		"roles": []string{"admin"},
-	})
-	claims, err := v.Verify(context.Background(), good)
-	if err != nil {
-		t.Fatalf("failed to verify token: %v", err)
-	}
-
-	if claims.Subject != "user_1" || len(claims.Role) != 1 || claims.Role[0] != "admin" {
-		t.Errorf("unexpected claims: %+v", claims)
-	}
-
-	expired := signRS256(t, priv, jwt.MapClaims{
-		"sub": "user_1", "iss": "iss-x", "aud": "aud-x",
-		"exp": time.Now().Add(-time.Hour).Unix(),
-	})
-
-	if _, err := v.Verify(context.Background(), expired); err == nil {
-		t.Error("süresi geçmiş token reddedilmeliydi")
-	}
-}
-
 func TestAuth_E2E(t *testing.T) {
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatalf("failed to generate RSA key: %v", err)
 	}
-	v := NewJWTVerifier(&priv.PublicKey, "iss-x", "aud-x")
+	v := auth.NewJWTVerifier(&priv.PublicKey, "iss-x", "aud-x")
 
 	whoami := func(w http.ResponseWriter, r *http.Request, params *router.Params) {
 		c, _ := reqctx.GetClaims(r.Context())
@@ -249,7 +207,13 @@ func BenchmarkAuth_E2E(b *testing.B) {
 	}
 	const issuer = "https://auth.local.test"
 	const audience = "api-gateway"
-	verifier := NewJWTVerifier(&priv.PublicKey, issuer, audience)
+
+	// To test performance WITHOUT caching, comment out NewCachingVerifier
+	// and directly use NewJWTVerifier below:
+	// verifier := auth.NewJWTVerifier(&priv.PublicKey, issuer, audience)
+	inner := auth.NewJWTVerifier(&priv.PublicKey, issuer, audience)
+	verifier := auth.NewCachingVerifier(inner, 1000, 5*time.Minute, time.Minute, time.Now)
+	defer verifier.Stop()
 
 	now := time.Now()
 	signed, err := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.RegisteredClaims{

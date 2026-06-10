@@ -2,6 +2,7 @@ package main
 
 import (
 	"api-gateway/handlers"
+	"api-gateway/internal/auth"
 	"api-gateway/internal/config"
 	"api-gateway/internal/mw"
 	"api-gateway/internal/routemw"
@@ -20,6 +21,8 @@ import (
 	"syscall"
 	"time"
 )
+
+var stopFns []func()
 
 func main() {
 	logger.Init()
@@ -49,18 +52,19 @@ func run(cfg *config.Config) {
 		os.Exit(1)
 	}
 
-	auth, err := buildAuth(cfg)
+	authMW, err := buildAuth(cfg)
 	if err != nil {
 		logger.Error("failed to build auth", slog.Any("error", err))
 		os.Exit(1)
 	}
 
-	registerRoutes(s, auth)
+	registerRoutes(s, authMW)
 	serve(s)
 }
 
 func registerMiddleware(s *server.Server, cfg *config.Config) error {
 	rl := mw.NewRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
+	stopFns = append(stopFns, rl.Stop)
 
 	s.Use(mw.Recovery)
 	s.Use(mw.RequestID)
@@ -76,13 +80,38 @@ func buildAuth(cfg *config.Config) (routemw.RouteMiddleware, error) {
 		return nil, nil
 	}
 
-	key, err := loadRSAPublicKey(cfg.JWTPublicKeyPath)
-	if err != nil {
-		logger.Error("failed to load RSA public key", slog.Any("error", err))
-		return nil, err
+	var inner auth.Verifier
+
+	if cfg.JWKSEnabled {
+		jv := auth.NewJWKSVerifier(
+			cfg.JWTIssuer,
+			cfg.JWTAudience,
+			cfg.JWKSUri,
+			cfg.JWKSCooldown,
+			cfg.JWKSRefreshInterval,
+			nil,
+		)
+		stopFns = append(stopFns, jv.Stop)
+		inner = jv
+	} else {
+		key, err := loadRSAPublicKey(cfg.JWTPublicKeyPath)
+		if err != nil {
+			logger.Error("failed to load RSA public key", slog.Any("error", err))
+			return nil, err
+		}
+		inner = auth.NewJWTVerifier(key, cfg.JWTIssuer, cfg.JWTAudience)
 	}
-	v := mw.NewJWTVerifier(key, cfg.JWTIssuer, cfg.JWTAudience)
-	return mw.Auth(v), nil
+
+	cv := auth.NewCachingVerifier(
+		inner,
+		cfg.AuthCacheSize,
+		cfg.AuthCacheTTL,
+		cfg.AuthCacheSweepInterval,
+		time.Now,
+	)
+	stopFns = append(stopFns, cv.Stop)
+
+	return mw.Auth(cv), nil
 }
 
 func registerRoutes(s *server.Server, auth routemw.RouteMiddleware) {
@@ -121,7 +150,10 @@ func serve(s *server.Server) {
 
 	if err := s.Shutdown(ctx); err != nil {
 		logger.Error("failed to shutdown server", slog.Any("error", err))
-		return
+	}
+
+	for i := len(stopFns) - 1; i >= 0; i-- {
+		stopFns[i]()
 	}
 
 	logger.Info("Server stopped gracefully")

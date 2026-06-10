@@ -1,10 +1,14 @@
 package reqctx
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type Claims struct {
 	Subject string
-	Role    []string
+	Roles   []string
+	Exp     time.Time
 }
 
 const claimsKey = contextKey("claims")

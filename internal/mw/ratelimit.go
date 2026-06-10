@@ -43,12 +43,14 @@ type client struct {
 }
 
 type RateLimiter struct {
-	mu      sync.Mutex
-	clients map[string]*client
-	rps     float64
-	burst   float64
-	now     func() time.Time
-	ttl     time.Duration
+	mu       sync.Mutex
+	clients  map[string]*client
+	rps      float64
+	burst    float64
+	now      func() time.Time
+	ttl      time.Duration
+	done     chan struct{}
+	stopOnce sync.Once
 }
 
 func NewRateLimiter(rps, burst float64) *RateLimiter {
@@ -57,7 +59,9 @@ func NewRateLimiter(rps, burst float64) *RateLimiter {
 		rps:     rps,
 		burst:   burst,
 		now:     time.Now,
-		ttl:     3 * time.Minute}
+		ttl:     3 * time.Minute,
+		done:    make(chan struct{}),
+	}
 	go r1.cleanup(time.Minute)
 	return r1
 }
@@ -75,8 +79,15 @@ func (rl *RateLimiter) bucketFor(ip string) *tokenBucket {
 }
 
 func (rl *RateLimiter) cleanup(interval time.Duration) {
-	for range time.Tick(interval) {
-		rl.evictStale()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			rl.evictStale()
+		case <-rl.done:
+			return
+		}
 	}
 }
 
@@ -109,5 +120,11 @@ func (rl *RateLimiter) RateLimit(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+func (rl *RateLimiter) Stop() {
+	rl.stopOnce.Do(func() {
+		close(rl.done)
 	})
 }

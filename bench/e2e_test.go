@@ -1,6 +1,7 @@
 package bench
 
 import (
+	"api-gateway/internal/auth"
 	"api-gateway/internal/mw"
 	"api-gateway/internal/router"
 	"crypto/rand"
@@ -24,7 +25,10 @@ func BenchmarkMW_E2E(b *testing.B) {
 	}
 	const issuer = "https://auth.local.test"
 	const audience = "api-gateway"
-	verifier := mw.NewJWTVerifier(&priv.PublicKey, issuer, audience)
+
+	inner := auth.NewJWTVerifier(&priv.PublicKey, issuer, audience)
+	verifier := auth.NewCachingVerifier(inner, 10000, 5*time.Minute, time.Minute, time.Now)
+	defer verifier.Stop()
 
 	now := time.Now()
 	signed, err := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.RegisteredClaims{
