@@ -4,113 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/json"
-	"errors"
-	"net/http"
-	"net/http/httptest"
 	"runtime"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
-
-type JWKSServer struct {
-	mu       sync.Mutex
-	server   *httptest.Server
-	jwks     JSONWebKeySet
-	fetches  int64
-	failMode bool
-}
-
-func NewJWKSServer() *JWKSServer {
-	s := &JWKSServer{}
-
-	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt64(&s.fetches, 1)
-
-		s.mu.Lock()
-		failMode := s.failMode
-		keys := s.jwks
-		s.mu.Unlock()
-
-		if failMode {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		_ = json.NewEncoder(w).Encode(keys)
-	})
-
-	s.server = httptest.NewServer(h)
-
-	return s
-}
-
-func (s *JWKSServer) SetJWKS(jwks ...JSONWebKey) {
-	s.mu.Lock()
-	s.jwks = JSONWebKeySet{Keys: jwks}
-	s.mu.Unlock()
-}
-
-func (s *JWKSServer) SetFailMode(fail bool) {
-	s.mu.Lock()
-	s.failMode = fail
-	s.mu.Unlock()
-}
-
-func (s *JWKSServer) URL() string {
-	return s.server.URL
-}
-
-func (s *JWKSServer) Fetches() int64 {
-	return atomic.LoadInt64(&s.fetches)
-}
-
-func (s *JWKSServer) Close() {
-	s.server.Close()
-}
-
-func signToken(
-	key any,
-	kid, sub, issuer, audience string,
-	signingMethod jwt.SigningMethod,
-	exp time.Time,
-) (string,
-	error) {
-	claims := jwt.RegisteredClaims{
-		Subject:   sub,
-		Issuer:    issuer,
-		Audience:  jwt.ClaimStrings{audience},
-		ExpiresAt: jwt.NewNumericDate(exp),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-	}
-
-	token := jwt.NewWithClaims(signingMethod, claims)
-	if kid != "" {
-		token.Header["kid"] = kid
-	}
-
-	switch signingMethod.(type) {
-	case *jwt.SigningMethodHMAC:
-		if _, ok := key.([]byte); !ok {
-			return "", errors.New("HMAC algoritması için key tipi []byte olmalıdır")
-		}
-	case *jwt.SigningMethodRSA:
-		if _, ok := key.(*rsa.PrivateKey); !ok {
-			return "", errors.New("RSA algoritması için key tipi *rsa.PrivateKey olmalıdır")
-		}
-	}
-
-	tokenString, err := token.SignedString(key)
-	if err != nil {
-		return "", err
-	}
-
-	return tokenString, nil
-}
 
 func TestJWKSVerifier_Verify(t *testing.T) {
 	const (

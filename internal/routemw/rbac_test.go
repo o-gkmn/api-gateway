@@ -1,39 +1,11 @@
 package routemw
 
 import (
-	"api-gateway/internal/reqctx"
 	"api-gateway/internal/router"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
-
-func didPanic(f func()) bool {
-	panicked := false
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				panicked = true
-			}
-		}()
-		f()
-	}()
-	return panicked
-}
-
-func setupTest(roles []string, requiredRoles ...string) (called *bool, w *httptest.ResponseRecorder, r *http.Request, h router.Handler) {
-	var c bool
-	handler := func(w http.ResponseWriter, r *http.Request, params *router.Params) {
-		c = true
-		w.WriteHeader(http.StatusOK)
-	}
-	verifier := &fakeVerifier{claims: &reqctx.Claims{Roles: roles}}
-	h = Auth(verifier)(RequireAnyRole(requiredRoles...)(handler))
-	w = httptest.NewRecorder()
-	r = httptest.NewRequest(http.MethodGet, "/", nil)
-	r.Header.Set("Authorization", "Bearer token")
-	return &c, w, r, h
-}
 
 func TestRBAC_Match(t *testing.T) {
 	called, w, r, h := setupTest([]string{"admin"}, "admin")

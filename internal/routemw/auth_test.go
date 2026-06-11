@@ -4,7 +4,6 @@ import (
 	"api-gateway/internal/auth"
 	"api-gateway/internal/reqctx"
 	"api-gateway/internal/router"
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
@@ -18,26 +17,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 )
-
-type fakeVerifier struct {
-	claims *reqctx.Claims
-	err    error
-}
-
-func (f *fakeVerifier) Verify(ctx context.Context, token string) (*reqctx.Claims, error) {
-	return f.claims, f.err
-}
-
-type nopWriter struct{ h http.Header }
-
-func (n *nopWriter) Header() http.Header {
-	if n.h == nil {
-		n.h = make(http.Header)
-	}
-	return n.h
-}
-func (n *nopWriter) Write(b []byte) (int, error) { return len(b), nil }
-func (n *nopWriter) WriteHeader(int)             {}
 
 func TestAuth_MissingHeader(t *testing.T) {
 	called := false

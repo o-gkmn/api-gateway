@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"api-gateway/internal/reqctx"
 	"context"
 	"errors"
 	"runtime"
@@ -10,55 +9,6 @@ import (
 	"testing"
 	"time"
 )
-
-func didPanic(f func()) bool {
-	panicked := false
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				panicked = true
-			}
-		}()
-		f()
-	}()
-	return panicked
-}
-
-type fakeClock struct {
-	mu sync.Mutex
-	t  time.Time
-}
-
-func (c *fakeClock) Now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.t
-}
-
-func (c *fakeClock) Advance(d time.Duration) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.t = c.t.Add(d)
-}
-
-type fakeVerifier struct {
-	err    error
-	exp    time.Time
-	vCount int32
-}
-
-func (f *fakeVerifier) Verify(ctx context.Context, token string) (*reqctx.Claims, error) {
-	atomic.AddInt32(&f.vCount, 1)
-	if f.err != nil {
-		return nil, f.err
-	}
-
-	return &reqctx.Claims{
-		Subject: token,
-		Roles:   []string{"admin"},
-		Exp:     f.exp,
-	}, nil
-}
 
 func TestCachingVerifier_CacheHit(t *testing.T) {
 	clock := &fakeClock{t: time.Now()}
