@@ -35,18 +35,19 @@ func Benchmark_E2E(b *testing.B) {
 	const cooldown = time.Second * 30
 	const refreshInterval = time.Minute * 15
 
-	inner := auth.NewJWTVerifier(&priv.PublicKey, issuer, audience)
-	//inner := auth.NewJWKSVerifier(issuer, audience, jwksUri, cooldown, refreshInterval, nil)
+	//inner := auth.NewJWTVerifier(&priv.PublicKey, issuer, audience)
+	inner := auth.NewJWKSVerifier(issuer, audience, jwksUri, cooldown, refreshInterval, nil)
 	verifier := auth.NewCachingVerifier(inner, 10000, 5*time.Minute, time.Minute, time.Now)
 	defer verifier.Stop()
 
 	now := time.Now()
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.RegisteredClaims{
-		Subject:   "user-123",
-		Issuer:    issuer,
-		Audience:  jwt.ClaimStrings{audience},
-		IssuedAt:  jwt.NewNumericDate(now),
-		ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"sub":   "user-123",
+		"iss":   issuer,
+		"aud":   jwt.ClaimStrings{audience},
+		"iat":   jwt.NewNumericDate(now).Unix(),
+		"exp":   jwt.NewNumericDate(now.Add(time.Hour)).Unix(),
+		"roles": []string{"admin", "user"},
 	})
 	token.Header["kid"] = "dev"
 
@@ -59,7 +60,7 @@ func Benchmark_E2E(b *testing.B) {
 	final := func(w http.ResponseWriter, r *http.Request, p *router.Params) {
 		w.WriteHeader(http.StatusOK)
 	}
-	protected := routemw.Auth(verifier)(final)
+	protected := routemw.Auth(verifier)(routemw.RequireAnyRole("admin")(final))
 
 	rt := router.NewRouter()
 	rt.GET("/", protected)
