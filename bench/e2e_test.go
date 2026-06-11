@@ -3,6 +3,7 @@ package bench
 import (
 	"api-gateway/internal/auth"
 	"api-gateway/internal/mw"
+	"api-gateway/internal/routemw"
 	"api-gateway/internal/router"
 	"io"
 	"log"
@@ -58,7 +59,7 @@ func Benchmark_E2E(b *testing.B) {
 	final := func(w http.ResponseWriter, r *http.Request, p *router.Params) {
 		w.WriteHeader(http.StatusOK)
 	}
-	protected := mw.Auth(verifier)(final)
+	protected := routemw.Auth(verifier)(final)
 
 	rt := router.NewRouter()
 	rt.GET("/", protected)

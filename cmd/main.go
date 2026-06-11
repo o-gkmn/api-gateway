@@ -121,15 +121,16 @@ func buildAuth(cfg *config.Config) (routemw.RouteMiddleware, error) {
 	)
 	stopFns = append(stopFns, cv.Stop)
 
-	return mw.Auth(cv), nil
+	return routemw.Auth(cv), nil
 }
 
 func registerRoutes(s *server.Server, auth routemw.RouteMiddleware) {
+	rbac := routemw.RequireAnyRole
 	ready := handlers.NewReadyHandler()
 
 	s.Router.GET("/healthz", handlers.HealthHandler)
 	s.Router.GET("/readyz", ready.ServeHTTP)
-	s.Router.GET("/whoami", routemw.Chain(handlers.WhoAmIHandler, auth))
+	s.Router.GET("/whoami", routemw.Chain(handlers.WhoAmIHandler, auth, rbac("admin", "user")))
 }
 
 func serve(s *server.Server) {

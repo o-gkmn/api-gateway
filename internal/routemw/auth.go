@@ -1,4 +1,4 @@
-package mw
+package routemw
 
 import (
 	"api-gateway/internal/auth"
