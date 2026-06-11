@@ -93,6 +93,16 @@ func buildAuth(cfg *config.Config) (routemw.RouteMiddleware, error) {
 		)
 		stopFns = append(stopFns, jv.Stop)
 		inner = jv
+	} else if cfg.IntrospectionEnabled {
+		iv := auth.NewIntrospectionVerifier(
+			cfg.IntrospectionEndpoint,
+			cfg.IntrospectionClientId,
+			cfg.IntrospectionClientSecret,
+			cfg.JWTIssuer,
+			cfg.JWTAudience,
+			nil,
+		)
+		inner = iv
 	} else {
 		key, err := loadRSAPublicKey(cfg.JWTPublicKeyPath)
 		if err != nil {
