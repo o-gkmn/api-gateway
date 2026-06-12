@@ -54,3 +54,31 @@ func setupTest(roles []string, requiredRoles ...string) (called *bool, w *httpte
 	r.Header.Set("Authorization", "Bearer token")
 	return &c, w, r, h
 }
+
+type testPayload struct {
+	Email   string `json:"email"`
+	Pass    string `json:"pass"`
+	IsValid bool   `json:"is_valid"`
+}
+
+func (t testPayload) Validate() ValidationErrors {
+	if !t.IsValid {
+		return ValidationErrors{
+			ValidationError{
+				Field:   "email",
+				Message: "email is required",
+			},
+		}
+	}
+
+	return nil
+}
+
+type infiniteZeroReader struct{}
+
+func (infiniteZeroReader) Read(p []byte) (n int, err error) {
+	for i := range p {
+		p[i] = 0
+	}
+	return len(p), nil
+}
