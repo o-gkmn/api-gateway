@@ -12,7 +12,7 @@ import (
 
 func TestCachingVerifier_CacheHit(t *testing.T) {
 	clock := &fakeClock{t: time.Now()}
-	exp := clock.Now().Add(time.Hour)
+	exp := clock.Now().Add(time.Hour).Unix()
 	inner := &fakeVerifier{
 		exp:    exp,
 		err:    nil,
@@ -28,7 +28,7 @@ func TestCachingVerifier_CacheHit(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if claims.Subject != token {
+	if claims.Sub != token {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 
@@ -37,7 +37,7 @@ func TestCachingVerifier_CacheHit(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if claims.Subject != token {
+	if claims.Sub != token {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 
@@ -49,7 +49,7 @@ func TestCachingVerifier_CacheHit(t *testing.T) {
 
 func TestCachingVerifier_CacheMiss(t *testing.T) {
 	clock := &fakeClock{t: time.Now()}
-	exp := clock.Now().Add(time.Hour)
+	exp := clock.Now().Add(time.Hour).Unix()
 	inner := &fakeVerifier{
 		exp:    exp,
 		err:    nil,
@@ -65,7 +65,7 @@ func TestCachingVerifier_CacheMiss(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if firstClaims.Subject != firstToken {
+	if firstClaims.Sub != firstToken {
 		t.Errorf("unexpected claims: %+v", firstClaims)
 	}
 
@@ -75,7 +75,7 @@ func TestCachingVerifier_CacheMiss(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if secondClaims.Subject != secondToken {
+	if secondClaims.Sub != secondToken {
 		t.Errorf("unexpected claims: %+v", secondClaims)
 	}
 
@@ -87,7 +87,7 @@ func TestCachingVerifier_CacheMiss(t *testing.T) {
 
 func TestCachingVerifier_TokenExpired(t *testing.T) {
 	clock := &fakeClock{t: time.Now()}
-	exp := clock.Now().Add(time.Minute)
+	exp := clock.Now().Add(time.Minute).Unix()
 	inner := &fakeVerifier{
 		exp:    exp,
 		err:    nil,
@@ -102,7 +102,7 @@ func TestCachingVerifier_TokenExpired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if claims.Subject != token {
+	if claims.Sub != token {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 
@@ -111,7 +111,7 @@ func TestCachingVerifier_TokenExpired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if claims.Subject != token {
+	if claims.Sub != token {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 
@@ -123,7 +123,7 @@ func TestCachingVerifier_TokenExpired(t *testing.T) {
 
 func TestCachingVerifier_CacheExpired(t *testing.T) {
 	clock := &fakeClock{t: time.Now()}
-	exp := clock.Now().Add(time.Hour)
+	exp := clock.Now().Add(time.Hour).Unix()
 	inner := &fakeVerifier{
 		exp:    exp,
 		err:    nil,
@@ -138,7 +138,7 @@ func TestCachingVerifier_CacheExpired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if claims.Subject != token {
+	if claims.Sub != token {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 
@@ -147,7 +147,7 @@ func TestCachingVerifier_CacheExpired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if claims.Subject != token {
+	if claims.Sub != token {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 
@@ -159,7 +159,7 @@ func TestCachingVerifier_CacheExpired(t *testing.T) {
 
 func TestCachingVerifier_ErrorsWillNotBeCached(t *testing.T) {
 	clock := &fakeClock{t: time.Now()}
-	exp := clock.Now().Add(time.Hour)
+	exp := clock.Now().Add(time.Hour).Unix()
 	inner := &fakeVerifier{
 		exp:    exp,
 		err:    errors.New("error"),
@@ -189,7 +189,7 @@ func TestCachingVerifier_ErrorsWillNotBeCached(t *testing.T) {
 
 func TestCachingVerifier_CapEviction(t *testing.T) {
 	clock := &fakeClock{t: time.Now()}
-	exp := clock.Now().Add(time.Hour)
+	exp := clock.Now().Add(time.Hour).Unix()
 	inner := &fakeVerifier{
 		exp:    exp,
 		err:    nil,
@@ -204,7 +204,7 @@ func TestCachingVerifier_CapEviction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if claims.Subject != token {
+	if claims.Sub != token {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 
@@ -213,7 +213,7 @@ func TestCachingVerifier_CapEviction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if claims.Subject != token {
+	if claims.Sub != token {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 
@@ -222,7 +222,7 @@ func TestCachingVerifier_CapEviction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if claims.Subject != token {
+	if claims.Sub != token {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 
@@ -231,7 +231,7 @@ func TestCachingVerifier_CapEviction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if claims.Subject != token {
+	if claims.Sub != token {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 
@@ -242,7 +242,7 @@ func TestCachingVerifier_CapEviction(t *testing.T) {
 
 func TestCachingVerifier_SweepExpired(t *testing.T) {
 	clock := &fakeClock{t: time.Now()}
-	exp := clock.Now().Add(time.Minute)
+	exp := clock.Now().Add(time.Minute).Unix()
 	inner := &fakeVerifier{
 		exp:    exp,
 		err:    nil,
@@ -257,7 +257,7 @@ func TestCachingVerifier_SweepExpired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if claims.Subject != token {
+	if claims.Sub != token {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 
@@ -270,7 +270,7 @@ func TestCachingVerifier_SweepExpired(t *testing.T) {
 
 func TestCachingVerifier_Concurrent(t *testing.T) {
 	clock := &fakeClock{t: time.Now()}
-	exp := clock.Now().Add(time.Minute)
+	exp := clock.Now().Add(time.Minute).Unix()
 	inner := &fakeVerifier{
 		exp:    exp,
 		err:    nil,
@@ -298,7 +298,7 @@ func TestCachingVerifier_Concurrent(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 				return
 			}
-			if claims.Subject != token {
+			if claims.Sub != token {
 				t.Errorf("unexpected claims: %+v", claims)
 			}
 		}()
@@ -316,7 +316,7 @@ func TestCachingVerifier_Stop(t *testing.T) {
 	goNumStart := runtime.NumGoroutine()
 
 	clock := &fakeClock{t: time.Now()}
-	exp := clock.Now().Add(time.Hour)
+	exp := clock.Now().Add(time.Hour).Unix()
 	inner := &fakeVerifier{
 		exp:    exp,
 		err:    nil,

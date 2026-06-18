@@ -1,19 +1,16 @@
 package main
 
 import (
-	"api-gateway/handlers"
 	"api-gateway/internal/auth"
 	"api-gateway/internal/config"
+	handlers2 "api-gateway/internal/handlers"
+	"api-gateway/internal/logger"
 	"api-gateway/internal/mw"
 	"api-gateway/internal/routemw"
-	"api-gateway/logger"
-	"api-gateway/server"
+	"api-gateway/internal/server"
+	"api-gateway/pkg/keys"
 	"context"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -103,8 +100,16 @@ func buildAuth(cfg *config.Config) (routemw.RouteMiddleware, error) {
 			nil,
 		)
 		inner = iv
+	} else if cfg.PasetoEnabled {
+		key, err := keys.LoadEd25519Public("keys/paseto_public.pem")
+		if err != nil {
+			return nil, err
+		}
+
+		iv := auth.NewPasetoVerifier(cfg.JWTIssuer, cfg.JWTAudience, key, nil)
+		inner = iv
 	} else {
-		key, err := loadRSAPublicKey(cfg.JWTPublicKeyPath)
+		key, err := keys.LoadRSAPublicKey(cfg.JWTPublicKeyPath)
 		if err != nil {
 			logger.Error("failed to load RSA public key", slog.Any("error", err))
 			return nil, err
@@ -126,11 +131,11 @@ func buildAuth(cfg *config.Config) (routemw.RouteMiddleware, error) {
 
 func registerRoutes(s *server.Server, auth routemw.RouteMiddleware) {
 	rbac := routemw.RequireAnyRole
-	ready := handlers.NewReadyHandler()
+	ready := handlers2.NewReadyHandler()
 
-	s.Router.GET("/healthz", handlers.HealthHandler)
+	s.Router.GET("/healthz", handlers2.HealthHandler)
 	s.Router.GET("/readyz", ready.ServeHTTP)
-	s.Router.GET("/whoami", routemw.Chain(handlers.WhoAmIHandler, auth, rbac("admin", "user")))
+	s.Router.GET("/whoami", routemw.Chain(handlers2.WhoAmIHandler, auth, rbac("admin", "user")))
 }
 
 func serve(s *server.Server) {
@@ -168,24 +173,4 @@ func serve(s *server.Server) {
 	}
 
 	logger.Info("Server stopped gracefully")
-}
-
-func loadRSAPublicKey(path string) (*rsa.PublicKey, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read RSA public key: %w", err)
-	}
-	block, _ := pem.Decode(data)
-	if block == nil {
-		return nil, errors.New("failed to decode PEM block")
-	}
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse RSA public key: %w", err)
-	}
-	rsaPub, ok := pub.(*rsa.PublicKey)
-	if !ok {
-		return nil, errors.New("failed to parse RSA public key")
-	}
-	return rsaPub, nil
 }

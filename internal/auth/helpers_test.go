@@ -2,6 +2,7 @@ package auth
 
 import (
 	"api-gateway/internal/reqctx"
+	"api-gateway/pkg/keys"
 	"context"
 	"crypto/rsa"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -49,7 +51,7 @@ func (c *fakeClock) Advance(d time.Duration) {
 // Fake Verifier
 type fakeVerifier struct {
 	err    error
-	exp    time.Time
+	exp    int64
 	vCount int32
 }
 
@@ -60,9 +62,9 @@ func (f *fakeVerifier) Verify(ctx context.Context, token string) (*reqctx.Claims
 	}
 
 	return &reqctx.Claims{
-		Subject: token,
-		Roles:   []string{"admin"},
-		Exp:     f.exp,
+		Sub:   token,
+		Roles: []string{"admin"},
+		Exp:   f.exp,
 	}, nil
 }
 
@@ -264,4 +266,24 @@ func defaultIntrospectionResponse(clock *fakeClock) IntrospectionResponse {
 func (s *OAuth2Server) NewTestVerifier(resp IntrospectionResponse,
 	clock *fakeClock) *IntrospectionVerifier {
 	return NewIntrospectionVerifier(s.server.URL, s.expectedUser, s.expectedSecret, resp.Iss, resp.Aud, clock.Now)
+}
+
+func setupPasetoVerifier(t *testing.T, issuer, audience string) (*PasetoVerifier, string, *fakeClock) {
+	token := "v4.public.eyJhdWQiOiJhcGktZ2F0ZXdheSIsImV4cCI6MTc4MTcwNzA2MywiaXNzIjoiaHR0cHM6Ly9hdXRoLmxvY2FsLnRlc3QiLCJyb2xlcyI6WyJhZG1pbiJdLCJzdWIiOiJ1c2VyXzEifXCpuKOv_lS7qhixOLVH-iciSXU4AnyoPXgT7uWD_xjOO2uPqe6wBrjDVKHTc6dSfZAumEvCP2ndIhJjSl-nggw"
+
+	pubKey, err := keys.LoadEd25519Public("testdata/paseto_public.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clock := &fakeClock{t: time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC)}
+
+	v := &PasetoVerifier{
+		key:      pubKey,
+		issuer:   issuer,
+		audience: audience,
+		now:      clock.Now,
+	}
+
+	return v, token, clock
 }

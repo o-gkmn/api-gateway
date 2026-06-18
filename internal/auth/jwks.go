@@ -1,8 +1,8 @@
 package auth
 
 import (
+	"api-gateway/internal/logger"
 	"api-gateway/internal/reqctx"
-	"api-gateway/logger"
 	"context"
 	"crypto"
 	"crypto/rsa"
@@ -125,8 +125,7 @@ func (v *JWKSVerifier) Verify(ctx context.Context, token string) (*reqctx.Claims
 	}
 
 	exp, _ := mc["exp"].(float64)
-	expTime := time.Unix(int64(exp), 0)
-	return &reqctx.Claims{Subject: sub, Roles: roles, Exp: expTime}, nil
+	return &reqctx.Claims{Sub: sub, Roles: roles, Exp: int64(exp)}, nil
 }
 
 func PublicKeyToJWK(pub *rsa.PublicKey, kid string) JSONWebKey {

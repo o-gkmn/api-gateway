@@ -39,7 +39,7 @@ func TestJWTVerifier_Verify(t *testing.T) {
 		t.Fatalf("failed to verify token: %v", err)
 	}
 
-	if claims.Subject != "user_1" || len(claims.Roles) != 1 || claims.Roles[0] != "admin" {
+	if claims.Sub != "user_1" || len(claims.Roles) != 1 || claims.Roles[0] != "admin" {
 		t.Errorf("unexpected claims: %+v", claims)
 	}
 

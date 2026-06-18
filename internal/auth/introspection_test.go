@@ -18,8 +18,8 @@ func TestIntrospectionVerifier_Verify(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if claims.Subject != "sub123" {
-		t.Errorf("expected subject to be sub123, got %v", claims.Subject)
+	if claims.Sub != "sub123" {
+		t.Errorf("expected subject to be sub123, got %v", claims.Sub)
 	}
 }
 

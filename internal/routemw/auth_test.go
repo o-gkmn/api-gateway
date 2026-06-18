@@ -90,7 +90,7 @@ func TestAuth_InvalidToken(t *testing.T) {
 }
 
 func TestAuth_ValidToken_PutsClaimsInContext(t *testing.T) {
-	want := &reqctx.Claims{Subject: "test", Roles: []string{"admin"}}
+	want := &reqctx.Claims{Sub: "test", Roles: []string{"admin"}}
 	var got *reqctx.Claims
 	called := false
 
@@ -114,8 +114,8 @@ func TestAuth_ValidToken_PutsClaimsInContext(t *testing.T) {
 		t.Error("handler should not be called when Authorization header is valid")
 	}
 
-	if got.Subject != want.Subject {
-		t.Errorf("got %s, want %s", got.Subject, want.Subject)
+	if got.Sub != want.Sub {
+		t.Errorf("got %s, want %s", got.Sub, want.Sub)
 	}
 }
 
@@ -128,7 +128,7 @@ func TestAuth_E2E(t *testing.T) {
 
 	whoami := func(w http.ResponseWriter, r *http.Request, params *router.Params) {
 		c, _ := reqctx.GetClaims(r.Context())
-		fmt.Fprintf(w, "sub=%s", c.Subject)
+		fmt.Fprintf(w, "sub=%s", c.Sub)
 	}
 
 	protected := Auth(v)(whoami)

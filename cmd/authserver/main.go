@@ -2,18 +2,14 @@ package main
 
 import (
 	"api-gateway/internal/auth"
-	"crypto/rsa"
-	"crypto/x509"
+	"api-gateway/pkg/keys"
 	"encoding/json"
-	"encoding/pem"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
 )
 
 func main() {
-	privateKey, err := LoadRSAPrivateKey("keys/jwt_private.pem")
+	privateKey, err := keys.LoadRSAPrivateKey("keys/jwt_private.pem")
 	if err != nil {
 		log.Fatalf("failed to load private key: %v", err)
 	}
@@ -34,23 +30,4 @@ func main() {
 	if err := http.ListenAndServe(":8081", nil); err != nil {
 		log.Fatalf("Server failed: %v\n", err)
 	}
-}
-
-func LoadRSAPrivateKey(path string) (*rsa.PrivateKey, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	block, _ := pem.Decode(data)
-	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM block")
-	}
-
-	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return key.(*rsa.PrivateKey), nil
 }

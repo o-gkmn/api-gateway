@@ -1,9 +1,9 @@
 package server
 
 import (
+	"api-gateway/internal/logger"
 	"api-gateway/internal/mw"
 	"api-gateway/internal/router"
-	"api-gateway/logger"
 	"context"
 	"fmt"
 	"net/http"

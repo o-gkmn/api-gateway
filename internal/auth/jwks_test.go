@@ -48,8 +48,8 @@ func TestJWKSVerifier_Verify(t *testing.T) {
 		t.Fatalf("failed to verify token: %v", err)
 	}
 
-	if claims.Subject != sub {
-		t.Fatalf("invalid claims subject: %v", claims.Subject)
+	if claims.Sub != sub {
+		t.Fatalf("invalid claims subject: %v", claims.Sub)
 	}
 
 	if got := s.Fetches(); got != 1 {
@@ -94,8 +94,8 @@ func TestJWKSVerifier_OnMissRefresh(t *testing.T) {
 		t.Fatalf("failed to verify token: %v", err)
 	}
 
-	if claims.Subject != sub {
-		t.Fatalf("invalid claims subject: %v", claims.Subject)
+	if claims.Sub != sub {
+		t.Fatalf("invalid claims subject: %v", claims.Sub)
 	}
 	if got := s.Fetches(); got != 1 {
 		t.Fatalf("expected 1 fetch, got %d", got)
@@ -119,8 +119,8 @@ func TestJWKSVerifier_OnMissRefresh(t *testing.T) {
 		t.Fatalf("failed to verify token: %v", err)
 	}
 
-	if claims.Subject != sub {
-		t.Fatalf("invalid claims subject: %v", claims.Subject)
+	if claims.Sub != sub {
+		t.Fatalf("invalid claims subject: %v", claims.Sub)
 	}
 
 	if got := s.Fetches(); got != 2 {
@@ -238,8 +238,8 @@ func TestJWKSVerifier_CoolDown(t *testing.T) {
 		t.Fatalf("failed to verify token: %v", err)
 	}
 
-	if claims.Subject != sub {
-		t.Fatalf("invalid claims subject: %v", claims.Subject)
+	if claims.Sub != sub {
+		t.Fatalf("invalid claims subject: %v", claims.Sub)
 	}
 
 	if got := s.Fetches(); got != 2 {

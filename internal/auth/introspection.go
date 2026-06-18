@@ -106,12 +106,11 @@ func (v *IntrospectionVerifier) Verify(ctx context.Context, token string) (*reqc
 		return nil, errors.New("token expired")
 	}
 
-	exp := time.Unix(r.Exp, 0)
 	roles := strings.Fields(r.Scope)
 	claims := &reqctx.Claims{
-		Subject: r.Sub,
-		Roles:   roles,
-		Exp:     exp,
+		Sub:   r.Sub,
+		Roles: roles,
+		Exp:   r.Exp,
 	}
 
 	return claims, nil

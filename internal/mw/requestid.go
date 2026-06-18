@@ -1,8 +1,8 @@
 package mw
 
 import (
+	"api-gateway/internal/logger"
 	"api-gateway/internal/reqctx"
-	"api-gateway/logger"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"

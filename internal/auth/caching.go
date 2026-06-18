@@ -2,7 +2,7 @@ package auth
 
 import (
 	"api-gateway/internal/reqctx"
-	"api-gateway/utils"
+	"api-gateway/internal/utils"
 	"context"
 	"crypto/sha256"
 	"sync"
@@ -114,9 +114,10 @@ func (v *CachingVerifier) Verify(ctx context.Context, token string) (*reqctx.Cla
 		}
 	}
 
+	exp := time.Unix(claims.Exp, 0)
 	v.cache[hash] = cacheEntry{
 		claims:   claims,
-		exp:      claims.Exp,
+		exp:      exp,
 		cachedAt: v.now(),
 	}
 	v.mu.Unlock()

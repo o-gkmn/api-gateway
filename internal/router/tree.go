@@ -1,7 +1,7 @@
 package router
 
 import (
-	"api-gateway/logger"
+	"api-gateway/internal/logger"
 	"fmt"
 	"log/slog"
 	"net/http"

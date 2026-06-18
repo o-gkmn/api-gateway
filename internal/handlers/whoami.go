@@ -14,7 +14,7 @@ func WhoAmIHandler(w http.ResponseWriter, r *http.Request, params *router.Params
 		return
 	}
 
-	resp := fmt.Sprintf("sub %s, roles=%v", claims.Subject, claims.Roles)
+	resp := fmt.Sprintf("sub %s, roles=%v", claims.Sub, claims.Roles)
 	w.Write([]byte(resp))
 	w.WriteHeader(http.StatusOK)
 }

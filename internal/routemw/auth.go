@@ -21,7 +21,7 @@ func Auth(verifier auth.Verifier) func(handler router.Handler) router.Handler {
 			claims, err := verifier.Verify(r.Context(), tok)
 			if err != nil {
 				w.Header().Set("WWW-Authenticate", "Bearer")
-				http.Error(w, "invalid token", http.StatusUnauthorized)
+				http.Error(w, err.Error(), http.StatusUnauthorized)
 				return
 			}
 			ctx := reqctx.WithClaims(r.Context(), claims)

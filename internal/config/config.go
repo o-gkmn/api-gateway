@@ -1,7 +1,7 @@
 package config
 
 import (
-	"api-gateway/utils"
+	"api-gateway/internal/utils"
 	"fmt"
 	"time"
 )
@@ -26,6 +26,8 @@ type Config struct {
 	IntrospectionEndpoint     string
 	IntrospectionClientId     string
 	IntrospectionClientSecret string
+	PasetoEnabled             bool
+	PasetoPublicKeyPath       string
 	RateLimitRPS              float64
 	RateLimitBurst            float64
 	ReadHeaderTimeout         time.Duration
@@ -55,6 +57,8 @@ func Load() (*Config, error) {
 		IntrospectionEndpoint:     utils.GetEnv("INTROSPECTION_ENDPOINT", ""),
 		IntrospectionClientId:     utils.GetEnv("INTROSPECTION_CLIENT_ID", ""),
 		IntrospectionClientSecret: utils.GetEnv("INTROSPECTION_CLIENT_SECRET", ""),
+		PasetoEnabled:             utils.GetEnvBool("PASETO_ENABLED", false),
+		PasetoPublicKeyPath:       utils.GetEnv("PASETO_PUBLIC_KEY_PATH", ""),
 		RateLimitRPS:              utils.GetEnvFloat("RATE_LIMIT_RPS", 10),
 		RateLimitBurst:            utils.GetEnvFloat("RATE_LIMIT_BURST", 20),
 		ReadHeaderTimeout:         utils.GetEnvDuration("READ_HEADER_TIMEOUT", 5) * time.Second,
@@ -94,6 +98,12 @@ func Load() (*Config, error) {
 	if cfg.JWKSEnabled {
 		if cfg.JWKSUri == "" {
 			return nil, fmt.Errorf("JWKS_URI is required")
+		}
+	}
+
+	if cfg.PasetoEnabled {
+		if cfg.PasetoPublicKeyPath == "" {
+			return nil, fmt.Errorf("PASETO_PUBLIC_KEY_PATH is required")
 		}
 	}
 

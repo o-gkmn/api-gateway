@@ -5,6 +5,9 @@ import (
 	"api-gateway/internal/mw"
 	"api-gateway/internal/routemw"
 	"api-gateway/internal/router"
+	"api-gateway/pkg/keys"
+	"api-gateway/pkg/paseto"
+	"encoding/json"
 	"io"
 	"log"
 	"log/slog"
@@ -20,11 +23,11 @@ import (
 func Benchmark_E2E(b *testing.B) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 
-	keyPEM, err := os.ReadFile("../keys/jwt_private.pem")
+	jwtPriv, err := os.ReadFile("../keys/jwt_private.pem")
 	if err != nil {
 		log.Fatalf("read private key (önce ./cmd/genkey çalıştırdın mı?): %v", err)
 	}
-	priv, err := jwt.ParseRSAPrivateKeyFromPEM(keyPEM)
+	priv, err := jwt.ParseRSAPrivateKeyFromPEM(jwtPriv)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -70,6 +73,72 @@ func Benchmark_E2E(b *testing.B) {
 	req := httptest.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "127.0.0.1:1234"
 	req.Header.Set("Authorization", "Bearer "+signed)
+	w := httptest.NewRecorder()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		h.ServeHTTP(w, req)
+	}
+}
+
+func Benchmark_E2EWithPaseto(b *testing.B) {
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	pasetoPub, err := keys.LoadEd25519Public("../keys/paseto_public.pem")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	const issuer = "https://auth.local.test"
+	const audience = "api-gateway"
+
+	inner := auth.NewPasetoVerifier(issuer, audience, pasetoPub, nil)
+	verifier := auth.NewCachingVerifier(inner, 10000, 5*time.Minute, time.Minute, time.Now)
+	defer verifier.Stop()
+
+	claims := map[string]any{
+		"sub":   "user_1",
+		"iss":   "https://auth.local.test",
+		"aud":   "api-gateway",
+		"roles": []string{"admin"},
+		"exp":   time.Now().Add(time.Hour).Unix(),
+	}
+
+	jsonBytes, err := json.Marshal(claims)
+	if err != nil {
+		log.Fatalf("JSON'a dönüştürülürken hata oluştu: %v", err)
+	}
+
+	m := string(jsonBytes)
+	f := ""
+	i := ""
+
+	privateKey, err := keys.LoadEd25519Private("../keys/paseto_private.pem")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mBytes := []byte(m)
+	fBytes := []byte(f)
+	iBytes := []byte(i)
+
+	token := paseto.SignV4Public(privateKey, mBytes, fBytes, iBytes)
+
+	rl := mw.NewRateLimiter(1e9, 1e9)
+	final := func(w http.ResponseWriter, r *http.Request, p *router.Params) {
+		w.WriteHeader(http.StatusOK)
+	}
+	protected := routemw.Auth(verifier)(routemw.RequireAnyRole("admin")(final))
+
+	rt := router.NewRouter()
+	rt.GET("/", protected)
+
+	h := mw.Chain(rt, mw.Recovery, mw.RequestID, mw.Logger, rl.RateLimit)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	b.ReportAllocs()
