@@ -3,6 +3,7 @@ package utils
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -26,6 +27,18 @@ func GetEnvInt(key string, fallback int) int {
 		}
 		return result
 	}
+	return fallback
+}
+
+func GetEnvInt32(key string, fallback int32) int32 {
+	if value, ok := os.LookupEnv(key); ok {
+		result, err := strconv.ParseInt(value, 10, 32)
+		if err != nil {
+			return fallback
+		}
+		return int32(result)
+	}
+
 	return fallback
 }
 
@@ -59,5 +72,13 @@ func GetEnvBool(key string, fallback bool) bool {
 		}
 		return result
 	}
+	return fallback
+}
+
+func GetEnvSlice(key string, fallback []string) []string {
+	if value, ok := os.LookupEnv(key); ok {
+		return strings.Split(value, ",")
+	}
+
 	return fallback
 }

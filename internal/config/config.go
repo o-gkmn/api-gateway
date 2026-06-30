@@ -34,6 +34,18 @@ type Config struct {
 	ReadTimeout               time.Duration
 	WriteTimeout              time.Duration
 	IdleTimeout               time.Duration
+	DialTimeout               time.Duration
+	DialKeepAlive             time.Duration
+	MaxIdleConns              int
+	MaxIdleConnsPerHost       int
+	MaxConnsPerHost           int
+	IdleConnTimeout           time.Duration
+	ResponseHeaderTimeout     time.Duration
+	ForceAttemptHTTP2         bool
+	UpstreamURLs              []string
+	UpstreamHealthPath        string
+	UpstreamThreshold         int32
+	UpstreamHealthInterval    time.Duration
 }
 
 func Load() (*Config, error) {
@@ -65,6 +77,18 @@ func Load() (*Config, error) {
 		ReadTimeout:               utils.GetEnvDuration("READ_TIMEOUT", 15) * time.Second,
 		WriteTimeout:              utils.GetEnvDuration("WRITE_HEADER_TIMEOUT", 15) * time.Second,
 		IdleTimeout:               utils.GetEnvDuration("IDLE_TIMEOUT", 60) * time.Second,
+		DialTimeout:               utils.GetEnvDuration("DIAL_TIMEOUT", 5) * time.Second,
+		DialKeepAlive:             utils.GetEnvDuration("DIAL_KEEP_ALIVE", 30) * time.Second,
+		MaxIdleConns:              utils.GetEnvInt("MAX_IDLE_CONNS", 100),
+		MaxIdleConnsPerHost:       utils.GetEnvInt("MAX_IDLE_CONNS_PER_HOST", 20),
+		MaxConnsPerHost:           utils.GetEnvInt("MAX_CONNS_PER_HOST", 50),
+		IdleConnTimeout:           utils.GetEnvDuration("IDLE_CONN_TIMEOUT", 90) * time.Second,
+		ResponseHeaderTimeout:     utils.GetEnvDuration("RESPONSE_HEADER_TIMEOUT", 10) * time.Second,
+		ForceAttemptHTTP2:         utils.GetEnvBool("FORCE_ATTEMPT_HTTP2", true),
+		UpstreamURLs:              utils.GetEnvSlice("UPSTREAM_URLS", []string{}),
+		UpstreamHealthPath:        utils.GetEnv("UPSTREAM_HEALTH_PATH", "/health"),
+		UpstreamThreshold:         utils.GetEnvInt32("UPSTREAM_THRESHOLD", 3),
+		UpstreamHealthInterval:    utils.GetEnvDuration("UPSTREAM_HEALTH_INTERVAL", 10) * time.Second,
 	}
 
 	if cfg.AuthEnabled {

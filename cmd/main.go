@@ -3,15 +3,17 @@ package main
 import (
 	"api-gateway/internal/auth"
 	"api-gateway/internal/config"
-	handlers2 "api-gateway/internal/handlers"
+	"api-gateway/internal/handlers"
 	"api-gateway/internal/logger"
 	"api-gateway/internal/mw"
+	"api-gateway/internal/proxy"
 	"api-gateway/internal/routemw"
 	"api-gateway/internal/server"
 	"api-gateway/pkg/keys"
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -55,7 +57,8 @@ func run(cfg *config.Config) {
 		os.Exit(1)
 	}
 
-	registerRoutes(s, authMW)
+	prx := buildProxy(cfg)
+	registerRoutes(s, prx, authMW)
 	serve(s)
 }
 
@@ -129,13 +132,50 @@ func buildAuth(cfg *config.Config) (routemw.RouteMiddleware, error) {
 	return routemw.Auth(cv), nil
 }
 
-func registerRoutes(s *server.Server, auth routemw.RouteMiddleware) {
-	rbac := routemw.RequireAnyRole
-	ready := handlers2.NewReadyHandler()
+func buildProxy(cfg *config.Config) *proxy.Proxy {
+	transport := buildTransport(cfg)
+	stopFns = append(stopFns, transport.CloseIdleConnections)
 
-	s.Router.GET("/healthz", handlers2.HealthHandler)
-	s.Router.GET("/readyz", ready.ServeHTTP)
-	s.Router.GET("/whoami", routemw.Chain(handlers2.WhoAmIHandler, auth, rbac("admin", "user")))
+	pool := proxy.NewPool(
+		cfg.UpstreamURLs,
+		&proxy.RoundRobin{},
+		cfg.UpstreamHealthPath,
+		cfg.UpstreamThreshold,
+		cfg.UpstreamHealthInterval,
+	)
+	stopFns = append(stopFns, pool.Stop)
+
+	return proxy.NewProxy(pool, transport)
+}
+
+func buildTransport(cfg *config.Config) *http.Transport {
+	dialer := &net.Dialer{
+		Timeout:   cfg.DialTimeout,
+		KeepAlive: cfg.DialKeepAlive,
+	}
+
+	return &http.Transport{
+		DialContext:           dialer.DialContext,
+		MaxIdleConns:          cfg.MaxIdleConns,
+		MaxIdleConnsPerHost:   cfg.MaxIdleConnsPerHost,
+		MaxConnsPerHost:       cfg.MaxConnsPerHost,
+		IdleConnTimeout:       cfg.IdleConnTimeout,
+		ResponseHeaderTimeout: cfg.ResponseHeaderTimeout,
+		ForceAttemptHTTP2:     cfg.ForceAttemptHTTP2,
+	}
+}
+
+func registerRoutes(s *server.Server, prx *proxy.Proxy, authMW routemw.RouteMiddleware) {
+	rbac := routemw.RequireAnyRole
+
+	ready := handlers.NewReadyHandler().ServeHTTP
+	whoami := routemw.Chain(handlers.WhoAmIHandler, authMW, rbac("admin", "user"))
+
+	s.Router.GET("/healthz", handlers.HealthHandler)
+	s.Router.GET("/readyz", ready)
+	s.Router.GET("/whoami", whoami)
+
+	s.Router.GET("/users/:id", routemw.Chain(prx.ServeHTTP, authMW, rbac("user", "admin")))
 }
 
 func serve(s *server.Server) {
