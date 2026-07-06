@@ -57,6 +57,12 @@ func (p *Proxy) rewrite(pr *httputil.ProxyRequest) {
 	pr.SetURL(inst.URL)
 	pr.SetXForwarded()
 
+	pr.Out.Header.Del("Authorization")
+
+	if requestID, ok := reqctx.GetRequestID(pr.In.Context()); ok {
+		pr.Out.Header.Set("X-Request-ID", requestID)
+	}
+
 	if claims, ok := reqctx.GetClaims(pr.In.Context()); ok {
 		pr.Out.Header.Set("X-Gateway-Sub", claims.Sub)
 		pr.Out.Header.Set("X-Gateway-Roles", strings.Join(claims.Roles, ","))

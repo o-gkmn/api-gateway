@@ -11,7 +11,7 @@ import (
 
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := reqctx.RequestID(r.Context())
+		id, _ := reqctx.GetRequestID(r.Context())
 		start := time.Now()
 
 		wrapper := httpx.WrapWriter(w)

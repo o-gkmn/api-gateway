@@ -10,7 +10,7 @@ import (
 
 func TestRequestID_Concurrent(t *testing.T) {
 	h := RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if id, ok := reqctx.RequestID(r.Context()); !ok || id == "" {
+		if id, ok := reqctx.GetRequestID(r.Context()); !ok || id == "" {
 			t.Error("request id not exist in context")
 		}
 		w.WriteHeader(http.StatusOK)

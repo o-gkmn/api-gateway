@@ -20,7 +20,7 @@ func Recovery(next http.Handler) http.Handler {
 				panic(rec)
 			}
 
-			id, _ := reqctx.RequestID(r.Context())
+			id, _ := reqctx.GetRequestID(r.Context())
 			logger.Error("panic recovered",
 				slog.String("request_id", id),
 				slog.Any("panic", rec),
