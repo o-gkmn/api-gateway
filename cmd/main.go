@@ -133,8 +133,10 @@ func buildAuth(cfg *config.Config) (routemw.RouteMiddleware, error) {
 }
 
 func buildProxy(cfg *config.Config) *proxy.Proxy {
-	transport := buildTransport(cfg)
-	stopFns = append(stopFns, transport.CloseIdleConnections)
+	baseTransport := buildTransport(cfg)
+	stopFns = append(stopFns, baseTransport.CloseIdleConnections)
+
+	retryTransport := proxy.NewRetryingTransport(baseTransport, cfg.MaxRetries, nil)
 
 	pool := proxy.NewPool(
 		cfg.UpstreamURLs,
@@ -145,7 +147,7 @@ func buildProxy(cfg *config.Config) *proxy.Proxy {
 	)
 	stopFns = append(stopFns, pool.Stop)
 
-	return proxy.NewProxy(pool, transport)
+	return proxy.NewProxy(pool, retryTransport)
 }
 
 func buildTransport(cfg *config.Config) *http.Transport {
@@ -176,6 +178,7 @@ func registerRoutes(s *server.Server, prx *proxy.Proxy, authMW routemw.RouteMidd
 	s.Router.GET("/whoami", whoami)
 
 	s.Router.GET("/users/:id", routemw.Chain(prx.ServeHTTP, authMW, rbac("user", "admin")))
+	s.Router.POST("/users/:id", routemw.Chain(prx.ServeHTTP, authMW, rbac("user", "admin")))
 }
 
 func serve(s *server.Server) {

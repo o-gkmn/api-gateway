@@ -46,6 +46,7 @@ type Config struct {
 	UpstreamHealthPath        string
 	UpstreamThreshold         int32
 	UpstreamHealthInterval    time.Duration
+	MaxRetries                int
 }
 
 func Load() (*Config, error) {
@@ -89,6 +90,7 @@ func Load() (*Config, error) {
 		UpstreamHealthPath:        utils.GetEnv("UPSTREAM_HEALTH_PATH", "/health"),
 		UpstreamThreshold:         utils.GetEnvInt32("UPSTREAM_THRESHOLD", 3),
 		UpstreamHealthInterval:    utils.GetEnvDuration("UPSTREAM_HEALTH_INTERVAL", 10) * time.Second,
+		MaxRetries:                utils.GetEnvInt("MAX_RETRIES", 3),
 	}
 
 	if cfg.AuthEnabled {
